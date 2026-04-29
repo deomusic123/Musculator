@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppNav } from "./app-nav";
+import { MobileRouteNav } from "./mobile-route-nav";
 
 interface AppShellProps {
   eyebrow: string;
@@ -26,6 +27,8 @@ export function AppShell({ eyebrow, title, description, children }: AppShellProp
           {children}
         </div>
       </div>
+
+      <MobileRouteNav />
     </main>
   );
 }

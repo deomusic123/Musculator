@@ -767,4 +767,30 @@ Solo web:
 ### Evidencia
 
 - Snapshot funcional validado en navegador para / con contenido de ProfileDashboard.
-- Commit de cierre R1: pendiente de registrar tras commit.
+- Commit de cierre R1: eb9e9c4 (refactor(shell): stage r1 home profile-only surface).
+
+## 28) Ejecucion Etapa R2 - Navegacion real mobile/desktop (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: mobile y desktop convergen en navegacion principal por rutas reales (/, /lab) sobre shell compartido.
+
+### Cambios aplicados
+
+- Archivo nuevo: apps/web/src/components/navigation/mobile-route-nav.tsx.
+- Archivo actualizado: apps/web/src/components/navigation/app-shell.tsx.
+- Accion:
+    - se agrega barra mobile global con links reales a / y /lab.
+    - AppShell monta MobileRouteNav para reutilizar el mismo patron en Home y en /lab/*.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Verificacion runtime:
+    - / renderiza nav mobile con Inicio y Lab.
+    - /lab/exercises mantiene interfaz del catalogo y conserva navegacion route-based.
+
+### Evidencia
+
+- Snapshot funcional de / con barra mobile route-based activa.
+- Snapshot funcional de /lab/exercises con shell + tabs + catalogo operativo.
+- Commit de cierre R2: pendiente de registrar tras commit.
