@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import Link from "next/link";
 import {
   clientCreateResponseSchema,
   clientListResponseSchema,
@@ -21,6 +20,7 @@ import {
   trainingTemplates,
 } from "@musculator/domain";
 import { startTransition, useDeferredValue, useEffect, useState, useTransition, type ReactNode } from "react";
+import { EmbeddedExerciseCatalog } from "@/components/lab/embedded-exercise-catalog";
 import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
 import type { SetupCheck } from "@/lib/platform/setup";
 import { TrainingIntakeForm } from "./intake-form";
@@ -681,9 +681,10 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   const athleteTitle = selectedClient?.fullName
     ? `PERFIL DEL ATLETA · ${selectedClient.fullName.toUpperCase()}`
     : "PERFIL DEL ATLETA · MODO PREVIEW";
-  const mobileActiveTab = dashboardSurface === "nutrition" ? "nutrition" : "profile";
+  const mobileActiveTab =
+    dashboardSurface === "nutrition" ? "nutrition" : dashboardSurface === "lab" ? "lab" : "profile";
 
-  const selectDashboardSurface = (surface: "profile" | "nutrition" | "clients") => {
+  const selectDashboardSurface = (surface: "profile" | "lab" | "nutrition" | "clients") => {
     setDashboardSurface(surface);
   };
 
@@ -1400,12 +1401,17 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               >
                 Perfil del cliente
               </button>
-              <Link
-                href="/lab/exercises"
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              <button
+                type="button"
+                onClick={() => selectDashboardSurface("lab")}
+                className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
+                  dashboardSurface === "lab"
+                    ? "bg-[#4cb894] text-slate-950"
+                    : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
+                }`}
               >
                 Lab
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={() => selectDashboardSurface("nutrition")}
@@ -1871,6 +1877,22 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                 </div>
               ) : null}
             </>
+          ) : dashboardSurface === "lab" ? (
+            <section className="grid gap-4">
+              <article className="rounded-[2.2rem] border border-white/8 bg-[#09111b] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.24em] text-white/45">Lab integrado</p>
+                    <h2 className="mt-2 text-3xl font-semibold text-white">Catalogo interno sin cambio de ruta</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-7 text-white/62">
+                      Esta vista comparte datos y logica con /lab/exercises, pero corre dentro del workspace principal para mantener flujo app-like en /.
+                    </p>
+                  </div>
+                </div>
+              </article>
+
+              <EmbeddedExerciseCatalog />
+            </section>
           ) : dashboardSurface === "nutrition" ? (
             <>
               <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
@@ -2460,6 +2482,11 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               onSelectTab={(tab) => {
                 if (tab === "profile") {
                   selectDashboardSurface("profile");
+                  return;
+                }
+
+                if (tab === "lab") {
+                  selectDashboardSurface("lab");
                   return;
                 }
 

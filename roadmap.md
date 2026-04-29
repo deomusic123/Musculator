@@ -1021,3 +1021,33 @@ Solo web:
     - apps/web/src/components/lab/exercise-catalog.tsx
     - apps/web/src/components/lab/embedded-exercise-catalog.tsx
 - El adaptador embebible queda listo para integrar en Home en la etapa U2 sin usar redireccion de ruta.
+- Commit de cierre U1: b09f915 (refactor(lab): stage u1 embeddable catalog core).
+
+## 35) Ejecucion Etapa U2 - Integracion Lab Interno en Home (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: al tocar Lab en Home, la app permanece en / y renderiza el catalogo nuevo embebido como panel interno.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - Lab desktop deja de usar Link y pasa a selector interno de superficie.
+    - se integra EmbeddedExerciseCatalog como panel Lab interno en el flujo principal.
+    - selectDashboardSurface y mobileActiveTab ahora contemplan lab como tab interna.
+- Archivo actualizado: apps/web/src/components/training/mobile-tab-bar.tsx.
+    - tab Lab deja de navegar por ruta y usa onSelectTab igual que Perfil/Nutricion.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke funcional en runtime:
+    - URL se mantiene en http://localhost:3000/ al seleccionar Lab.
+    - el panel interno muestra marcador de integracion "Lab integrado" y el catalogo nuevo con buscador/filtros.
+
+### Evidencia
+
+- Flujo validado: Perfil -> Lab -> (catalogo nuevo) sin redireccion fuera de /.
+- Marcadores visibles en la misma ruta:
+    - "Lab integrado"
+    - "Catalogo interno sin cambio de ruta"
+    - buscador "Buscar por nombre, musculo o patron".
