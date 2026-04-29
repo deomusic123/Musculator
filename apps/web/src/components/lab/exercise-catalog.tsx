@@ -134,6 +134,8 @@ function formatCns(value: number) {
 
 interface ExerciseCatalogProps {
   initialData: LabExerciseListResponse;
+  variant?: "standalone" | "embedded";
+  className?: string;
 }
 
 type FilterKey = "pattern" | "vector" | "equipment";
@@ -378,7 +380,7 @@ function ExerciseSheet({ exercise, onClose }: ExerciseSheetProps) {
   );
 }
 
-export function ExerciseCatalog({ initialData }: ExerciseCatalogProps) {
+export function ExerciseCatalog({ initialData, variant = "standalone", className }: ExerciseCatalogProps) {
   const [query, setQuery] = useState("");
   const [selectedExercise, setSelectedExercise] = useState<LabExerciseListItem | null>(null);
   const [activePattern, setActivePattern] = useState<LabExerciseListItem["movementPattern"] | "all">("all");
@@ -503,8 +505,13 @@ export function ExerciseCatalog({ initialData }: ExerciseCatalogProps) {
       .filter((group) => group.items.length > 0);
   }, [filteredExercises]);
 
+  const containerClass =
+    variant === "embedded"
+      ? "relative isolate space-y-4 overflow-hidden rounded-[2.2rem] border border-white/8 bg-[#09111b] p-4 text-white shadow-[0_24px_80px_rgba(2,6,23,0.35)]"
+      : "relative isolate space-y-4 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 p-3 text-zinc-100 sm:p-5";
+
   return (
-    <section className="relative isolate space-y-4 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 p-3 text-zinc-100 sm:p-5">
+    <section className={`${containerClass}${className ? ` ${className}` : ""}`}>
       <div className="pointer-events-none absolute -top-24 right-[-80px] h-52 w-52 rounded-full bg-cyan-600/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-52 w-52 rounded-full bg-red-600/10 blur-3xl" />
 

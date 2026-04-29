@@ -907,3 +907,117 @@ Solo web:
 - Snapshot runtime en / con Perfil intacto.
 - Snapshot runtime en /lab/exercises tras navegacion desde Home.
 - Commit de cierre: 52320f4 (feat(home-lab): route lab tab to new exercises surface).
+
+## 33) Plan de Refactor Unificado Single-App (2026-04-29)
+
+- Estado: planificado (sin implementacion en esta etapa).
+- Objetivo: unificar Home + Lab en una sola experiencia app-like dentro de /, sin redirecciones de pagina al cambiar entre Perfil y Lab.
+
+### Reglas de producto (bloqueantes)
+
+- No navegar a /lab/exercises al tocar Lab en Home.
+- Mantener / como superficie principal con cambio interno por estado (Perfil, Lab, Nutricion, Live).
+- Evitar doble navbar: se conserva solo la navegacion base de Home.
+- Reutilizar el catalogo nuevo de Lab Exercises dentro del panel Lab interno.
+- Unificar estilos para evitar choque visual entre tema Home y tema Lab actual.
+
+### Arquitectura objetivo
+
+- Workspace unico en / con paneles internos.
+- Panel Lab interno monta el nuevo catalogo como componente embebido, no como pagina externa.
+- Navegacion principal (desktop y mobile) controla panel interno, no rutas para Perfil/Lab.
+- /lab/* queda como superficie administrativa opcional (backoffice), no flujo primario del dia a dia.
+
+### Etapas de ejecucion propuestas
+
+#### Etapa U1 - Desacople de datos y componente de catalogo
+
+- Meta:
+    - separar la logica visual del catalogo nuevo para poder montarla dentro de Home/Lab interno.
+- Acciones:
+    - extraer una variante embebible del catalogo (sin header/shell externo duplicado).
+    - preparar adaptador para consumir los mismos datos en contexto interno.
+- Gate:
+    - typecheck en verde.
+    - catalogo embebible renderiza en story/local test sin navbar duplicado.
+- Evidencia esperada:
+    - lista de archivos refactorizados.
+    - captura del componente embebido aislado.
+
+#### Etapa U2 - Integracion del nuevo Lab dentro de Home
+
+- Meta:
+    - al tocar Lab en Home, mostrar el nuevo catalogo dentro del mismo localhost raiz.
+- Acciones:
+    - reemplazar contenido actual del panel Lab interno por catalogo nuevo embebido.
+    - conservar Perfil y Nutricion como paneles internos.
+    - eliminar cualquier push/redirect al pasar a Lab desde Home.
+- Gate:
+    - click en Lab no cambia ruta (permanece en /).
+    - panel Lab muestra el catalogo nuevo completo.
+    - Perfil mantiene comportamiento actual sin regresion.
+- Evidencia esperada:
+    - video corto o checklist de flujo Perfil -> Lab -> Perfil en misma ruta.
+
+#### Etapa U3 - Unificacion visual y de navegacion
+
+- Meta:
+    - coherencia total de estilos y navegacion en toda la experiencia raiz.
+- Acciones:
+    - normalizar paleta, bordes, tipografia y densidad entre paneles.
+    - retirar elementos de navegacion redundantes en modo embebido.
+    - asegurar consistencia desktop/mobile en tabs internos.
+- Gate:
+    - no hay segundo navbar visible al entrar en Lab interno.
+    - Home y Lab comparten sistema visual coherente.
+    - smoke funcional completo en / (Perfil, Lab, Nutricion, Live).
+- Evidencia esperada:
+    - capturas comparativas antes/despues.
+    - checklist UI/UX aprobado.
+
+### Riesgos y mitigacion
+
+- Riesgo: duplicacion de logica entre /lab/* y Lab interno.
+    - Mitigacion: usar componente base unico con wrappers de contexto.
+- Riesgo: regresion de rendimiento en Home por catalogo pesado.
+    - Mitigacion: memoizacion, render por secciones y controles de virtualizacion si hace falta.
+- Riesgo: inconsistencias visuales persistentes.
+    - Mitigacion: definir tokens visuales comunes antes de U3.
+
+### Orden de implementacion recomendado
+
+1. U1 (desacople).
+2. U2 (integracion interna sin redireccion).
+3. U3 (unificacion visual final).
+
+### Criterio de cierre
+
+- El usuario navega todo el flujo diario en / como app unica.
+- Lab interno muestra el nuevo catalogo sin cambiar de pagina.
+- No aparece navbar extra al abrir Lab desde Home.
+
+## 34) Ejecucion Etapa U1 - Desacople de Catalogo Embebible (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: separar el catalogo nuevo en modo reutilizable para Home interno y /lab/exercises sin duplicar logica de datos ni UI.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+    - se agrega soporte de variante visual reusable con props variant y className.
+    - se mantiene contrato base de datos via initialData para uso server-side.
+- Archivo nuevo: apps/web/src/components/lab/embedded-exercise-catalog.tsx.
+    - adaptador cliente para consumir /api/lab/exercises con cache no-store.
+    - fallback defensivo a estado preview vacio y mensaje de error no bloqueante.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke runtime en /lab/exercises sin regresiones visibles de catalogo, filtros ni listado.
+
+### Evidencia
+
+- Lista de archivos refactorizados para U1:
+    - apps/web/src/components/lab/exercise-catalog.tsx
+    - apps/web/src/components/lab/embedded-exercise-catalog.tsx
+- El adaptador embebible queda listo para integrar en Home en la etapa U2 sin usar redireccion de ruta.
