@@ -828,7 +828,7 @@ Solo web:
 ### Evidencia
 
 - Snapshots funcionales validados para /, /dashboard, /lab/exercises, /lab/templates y /lab/protocols.
-- Commit de cierre R3: pendiente de registrar tras commit.
+- Commit de cierre R3: 52481fe (refactor(routes): stage r3 cleanup dashboard legacy).
 
 ## 30) Cierre Refactor Home-Lab por Etapas (2026-04-29)
 
@@ -844,4 +844,4 @@ Solo web:
 
 - R1: eb9e9c4 - refactor(shell): stage r1 home profile-only surface.
 - R2: 309622b - refactor(nav): stage r2 route-based mobile shell nav.
-- R3: pendiente de registrar tras commit.
+- R3: 52481fe - refactor(routes): stage r3 cleanup dashboard legacy.
