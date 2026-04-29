@@ -683,3 +683,88 @@ Solo web:
 ### Evidencia funcional
 
 - Caso validado: Vector = FUERZA reduce listado a 13 ejercicios visibles y conserva agrupamiento sticky por patron.
+
+## 26) Plan de Refactor Arquitectonico Home vs Lab (2026-04-29)
+
+- Estado: en ejecucion por etapas con commit por cierre.
+- Objetivo: eliminar duplicidad Home/Lab, unificar navegacion por rutas reales y dejar Home enfocado en perfil + telemetria.
+
+### Alcance de refactor
+
+- Centralizar Training Lab en /lab/* como unica fuente de verdad para catalogo, rutinas y protocolos.
+- Limpiar Home / para que no renderice superficie Lab administrativa embebida.
+- Unificar el modelo de navegacion desktop/mobile para que ambos dependan de rutas reales.
+- Conservar modo live operativo, pero desacoplado del tab local que mezclaba superficies.
+
+### Etapas, gates y evidencia esperada
+
+#### Etapa R1 - Home limpio y separacion inicial de superficies
+
+- Acciones:
+    - Home / pasa a renderizar solo perfil/telemetria en layout shell.
+    - Se retira el mega workspace como superficie principal de Home.
+    - Se mantiene /lab/* como superficie administrativa separada.
+- Gate tecnico:
+    - npm.cmd run typecheck en verde.
+    - Home renderiza sin errores y sin tab local de Lab embebido.
+- Evidencia a registrar:
+    - Archivos tocados.
+    - Resultado de typecheck.
+    - Commit de cierre R1.
+
+#### Etapa R2 - Navegacion real mobile/desktop
+
+- Acciones:
+    - Mobile navigation deja de mutar estado local para cambiar "Lab" y navega por rutas.
+    - Desktop y mobile convergen en la misma arquitectura de rutas principales.
+    - Se normaliza la entrada a Lab desde navegacion principal.
+- Gate tecnico:
+    - npm.cmd run typecheck en verde.
+    - Navegacion mobile y desktop consistente hacia / y /lab.
+- Evidencia a registrar:
+    - Archivos tocados.
+    - Resultado de typecheck.
+    - Commit de cierre R2.
+
+#### Etapa R3 - Limpieza estructural final y compatibilidad
+
+- Acciones:
+    - Se eliminan alias y restos de arquitectura previa que generaban ambiguedad.
+    - Se alinean enlaces legacy y superficies auxiliares con la nueva jerarquia.
+    - Se valida la experiencia completa de rutas clave antes de cerrar refactor.
+- Gate tecnico:
+    - npm.cmd run typecheck en verde.
+    - Smoke manual de /, /lab/exercises, /lab/templates, /lab/protocols sin regresiones.
+- Evidencia a registrar:
+    - Archivos tocados.
+    - Resultado de typecheck.
+    - Commit de cierre R3.
+
+### Regla operativa de ejecucion
+
+- Cada etapa se implementa, se valida, se commitea y recien entonces se avanza a la siguiente.
+- No se revierte informacion historica previa en roadmap; solo se agregan resultados y evidencias.
+
+## 27) Ejecucion Etapa R1 - Home limpio y separacion inicial (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: Home / queda enfocada en perfil + telemetria y deja de montar TrainingWorkspace como superficie principal.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/app/(shell)/page.tsx.
+- Accion:
+    - reemplazo de TrainingWorkspace por AppShell + ProfileDashboard.
+    - eliminacion de dependencias de createTrainingTemplateSession y getSetupChecklist en Home.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Verificacion runtime de Home en http://localhost:3000:
+    - renderiza "Perfil y telemetria" en shell compartido.
+    - no aparece tab local de Lab embebido en Home.
+
+### Evidencia
+
+- Snapshot funcional validado en navegador para / con contenido de ProfileDashboard.
+- Commit de cierre R1: pendiente de registrar tras commit.
