@@ -157,6 +157,7 @@ interface FilterDropdownProps {
   active: boolean;
   opened: boolean;
   onToggle: () => void;
+  panelClassName?: string;
   children: ReactNode;
 }
 
@@ -197,7 +198,15 @@ function normalizeEquipment(equipment: string) {
   return "all";
 }
 
-function FilterDropdown({ title, valueLabel, active, opened, onToggle, children }: FilterDropdownProps) {
+function FilterDropdown({
+  title,
+  valueLabel,
+  active,
+  opened,
+  onToggle,
+  panelClassName,
+  children,
+}: FilterDropdownProps) {
   return (
     <div className="relative">
       <button
@@ -212,7 +221,11 @@ function FilterDropdown({ title, valueLabel, active, opened, onToggle, children 
       </button>
 
       {opened ? (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-40 min-w-[180px] rounded-lg border border-zinc-800 bg-zinc-900 p-1 shadow-xl shadow-black/40">
+        <div
+          className={`absolute left-0 top-[calc(100%+8px)] z-40 min-w-[180px] rounded-lg border p-1 shadow-xl shadow-black/40 ${
+            panelClassName ?? "border-zinc-800 bg-zinc-900"
+          }`}
+        >
           {children}
         </div>
       ) : null}
@@ -505,6 +518,35 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
       .filter((group) => group.items.length > 0);
   }, [filteredExercises]);
 
+  const isEmbedded = variant === "embedded";
+  const headerClass = isEmbedded
+    ? "border-b border-white/10 bg-[#09111b]/95"
+    : "border-b border-zinc-800/80 bg-zinc-950/90";
+  const inputClass = isEmbedded
+    ? "h-12 w-full rounded-2xl border border-white/10 bg-black/25 pl-11 pr-20 text-sm text-white outline-none transition focus:border-[#4cb894] focus:ring-2 focus:ring-[#4cb894]/20"
+    : "h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-900/50 pl-11 pr-20 text-sm text-zinc-100 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/30";
+  const shortcutClass = isEmbedded
+    ? "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55"
+    : "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-400";
+  const dropdownPanelClass = isEmbedded ? "border-white/10 bg-[#0d1724]" : "border-zinc-800 bg-zinc-900";
+  const dropdownItemClass = isEmbedded
+    ? "block w-full rounded-md px-2 py-1.5 text-left text-xs text-white/78 transition hover:bg-white/10"
+    : "block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800";
+  const metaClass = isEmbedded ? "text-xs text-white/55" : "text-xs text-zinc-500";
+  const sectionHeaderClass = isEmbedded
+    ? "sticky top-[124px] z-20 -mx-4 border-y border-white/10 bg-[#09111b]/95 px-4 py-2 backdrop-blur-md"
+    : "sticky top-[124px] z-20 -mx-3 border-y border-zinc-800/80 bg-zinc-950/95 px-3 py-2 backdrop-blur-md sm:-mx-5 sm:px-5";
+  const sectionTitleClass = isEmbedded
+    ? "text-[11px] font-semibold uppercase tracking-[0.22em] text-white/50"
+    : "text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500";
+  const countBadgeClass = isEmbedded
+    ? "rounded-md border border-white/10 bg-black/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60"
+    : "rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400";
+  const listDividerClass = isEmbedded ? "divide-y divide-white/10" : "divide-y divide-zinc-800";
+  const emptyStateClass = isEmbedded
+    ? "rounded-xl border border-white/10 bg-black/20 p-6 text-center text-sm text-white/65"
+    : "rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center text-sm text-zinc-400";
+
   const containerClass =
     variant === "embedded"
       ? "relative isolate space-y-4 overflow-hidden rounded-[2.2rem] border border-white/8 bg-[#09111b] p-4 text-white shadow-[0_24px_80px_rgba(2,6,23,0.35)]"
@@ -515,7 +557,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
       <div className="pointer-events-none absolute -top-24 right-[-80px] h-52 w-52 rounded-full bg-cyan-600/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 left-[-80px] h-52 w-52 rounded-full bg-red-600/10 blur-3xl" />
 
-      <div className="sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/90 pb-3 pt-1 backdrop-blur-md">
+      <div className={`sticky top-0 z-30 pb-3 pt-1 backdrop-blur-md ${headerClass}`}>
         <label className="relative mx-auto block max-w-3xl">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
@@ -523,10 +565,10 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por nombre, musculo o patron"
-            className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-900/50 pl-11 pr-20 text-sm text-zinc-100 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/30"
+            className={inputClass}
           />
 
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
+          <span className={shortcutClass}>
             Cmd/Ctrl + K
           </span>
         </label>
@@ -538,6 +580,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
             active={activePattern !== "all"}
             opened={openDropdown === "pattern"}
             onToggle={() => setOpenDropdown((current) => (current === "pattern" ? null : "pattern"))}
+            panelClassName={dropdownPanelClass}
           >
             <button
               type="button"
@@ -545,7 +588,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
                 setActivePattern("all");
                 setOpenDropdown(null);
               }}
-              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800"
+              className={dropdownItemClass}
             >
               Todos
             </button>
@@ -557,7 +600,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
                   setActivePattern(pattern);
                   setOpenDropdown(null);
                 }}
-                className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800"
+                className={dropdownItemClass}
               >
                 {movementLabel[pattern]}
               </button>
@@ -570,6 +613,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
             active={activeVector !== "all"}
             opened={openDropdown === "vector"}
             onToggle={() => setOpenDropdown((current) => (current === "vector" ? null : "vector"))}
+            panelClassName={dropdownPanelClass}
           >
             <button
               type="button"
@@ -577,7 +621,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
                 setActiveVector("all");
                 setOpenDropdown(null);
               }}
-              className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800"
+              className={dropdownItemClass}
             >
               Todos
             </button>
@@ -589,7 +633,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
                   setActiveVector(vector);
                   setOpenDropdown(null);
                 }}
-                className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800"
+                className={dropdownItemClass}
               >
                 {vectorLabel[vector]}
               </button>
@@ -602,6 +646,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
             active={activeEquipment !== "all"}
             opened={openDropdown === "equipment"}
             onToggle={() => setOpenDropdown((current) => (current === "equipment" ? null : "equipment"))}
+            panelClassName={dropdownPanelClass}
           >
             {(["all", "barra", "mancuerna", "maquina", "cable"] as EquipmentFilter[]).map((equipment) => (
               <button
@@ -611,7 +656,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
                   setActiveEquipment(equipment);
                   setOpenDropdown(null);
                 }}
-                className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-800"
+                className={dropdownItemClass}
               >
                 {equipmentLabel(equipment)}
               </button>
@@ -620,7 +665,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-1 text-xs text-zinc-500">
+      <div className={`flex items-center justify-between px-1 ${metaClass}`}>
         <span>{filteredExercises.length} ejercicios visibles</span>
         <span className="uppercase tracking-[0.14em]">{initialData.storage}</span>
       </div>
@@ -628,18 +673,18 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
       <motion.div layout className="space-y-5" initial={false}>
         {groupedExercises.map((group) => (
           <section key={group.pattern} className="space-y-1">
-            <div className="sticky top-[124px] z-20 -mx-3 border-y border-zinc-800/80 bg-zinc-950/95 px-3 py-2 backdrop-blur-md sm:-mx-5 sm:px-5">
+            <div className={sectionHeaderClass}>
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                <p className={sectionTitleClass}>
                   {movementSectionLabel[group.pattern]}
                 </p>
-                <span className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                <span className={countBadgeClass}>
                   {group.items.length}
                 </span>
               </div>
             </div>
 
-            <div className="divide-y divide-zinc-800">
+            <div className={listDividerClass}>
               {group.items.map((exercise) => (
                 <ExerciseCard key={exercise.slug} exercise={exercise} onSelect={setSelectedExercise} />
               ))}
@@ -649,7 +694,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
       </motion.div>
 
       {filteredExercises.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-center text-sm text-zinc-400">
+        <div className={emptyStateClass}>
           No hay resultados para esa combinacion de filtros.
         </div>
       ) : null}

@@ -1051,3 +1051,32 @@ Solo web:
     - "Lab integrado"
     - "Catalogo interno sin cambio de ruta"
     - buscador "Buscar por nombre, musculo o patron".
+- Commit de cierre U2: 87505fc (feat(home): stage u2 embed lab inside root workspace).
+
+## 36) Ejecucion Etapa U3 - Unificacion Visual y Navegacion (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: unificar la estetica del Lab embebido con Home y asegurar una sola navegacion visible dentro de / para el flujo diario.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+    - se agregan tokens visuales por variante embedded/standalone para mantener un solo core de componente.
+    - header sticky, input, dropdowns, headers de seccion y estados vacios del modo embebido pasan al lenguaje visual de Home.
+    - se conserva modo standalone para /lab/exercises sin romper backoffice.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke funcional en runtime (modo Lab interno):
+    - URL permanece en http://localhost:3000/.
+    - no aparecen tabs administrativos duplicados (Rutinas/Protocolos) en Home.
+    - se mantiene una sola navegacion principal de app (bottom tabs Perfil/Lab/Nutricion + Live).
+
+### Evidencia
+
+- Marcadores confirmados en Home Lab interno:
+    - "Lab integrado"
+    - "Catalogo interno sin cambio de ruta"
+    - "101 ejercicios visibles".
+- Verificacion de no navbar duplicada en modo embebido: ausencia de labels "Rutinas" y "Protocolos" en la vista /.
