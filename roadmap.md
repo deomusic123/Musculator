@@ -468,3 +468,218 @@ Solo web:
 
 - Rango observado recovery_time_dynamic_hours: minimo 49h, maximo 91h.
 - Resultado consistente con limites operativos configurados (18h-120h).
+
+## 20) Ejecucion Etapa 1 - Catalogo Lab UI/UX (2026-04-29)
+
+- Estado: implementada en codigo y validada por typecheck.
+- Objetivo: llevar /lab/exercises a experiencia Athlete OS mobile-first, con filtros instantaneos y detalle inmersivo.
+
+### Entregables aplicados
+
+- Route handler tipado creado:
+    - app/api/lab/exercises/route.ts
+- Capa de persistencia tipada para catalogo:
+    - apps/web/src/lib/lab/persistence.ts
+- UI interactiva implementada:
+    - apps/web/src/components/lab/exercise-catalog.tsx
+    - apps/web/src/app/(shell)/lab/exercises/page.tsx
+
+### UX/Interaccion implementada
+
+- Sticky header glassmorphism con buscador principal.
+- Quick filters horizontales por Patron y Vector con chips activables.
+- Listado mobile-first por tarjetas (sin tablas), con iconografia de patron.
+- Indicador CNS Tax basado en icono de rayo y color por rango:
+    - 9-10 rojo con glow.
+    - 5-8 ambar.
+    - menor a 5 cyan/verde.
+- Badge de stimulus_vector con estilos diferenciados por tipo.
+- Bottom sheet inmersivo al tocar tarjeta (sin navegar), con:
+    - metrica CNS
+    - recovery en horas
+    - resistencia
+    - tags de musculos primarios y sinergistas
+- Transiciones y presencia con Framer Motion.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+
+## 21) Hotfix Compatibilidad v_exercise_catalog (2026-04-29)
+
+- Estado: aplicado en codigo + migracion correctiva creada.
+- Incidente: en /lab/exercises se detecto error runtime en remoto:
+    - column v_exercise_catalog.movement_pattern does not exist.
+- Causa raiz: entorno con vista v_exercise_catalog en shape legacy (sin columnas biomecanicas nuevas), mientras la app ya consulta contrato expandido.
+
+### Mitigacion inmediata en app (sin downtime)
+
+- Archivo actualizado: apps/web/src/lib/lab/persistence.ts.
+- Cambio aplicado:
+    - si falla la consulta a v_exercise_catalog por columna inexistente, se activa fallback a tablas base (exercises + exercise_muscles + muscle_groups) para construir el mismo DTO del catalogo.
+    - si ese fallback tambien falla por schema legado profundo, la app baja a modo preview y evita crash de pantalla.
+
+### Correccion estructural SQL
+
+- Archivo nuevo: supabase/migrations/0004_refresh_exercise_catalog_view.sql.
+- Alcance:
+    - create or replace de public.v_exercise_catalog con columnas:
+      id, slug, name, movement_pattern, stimulus_vector, resistance_profile, is_compound, equipment, cns_tax_multiplier, primary_muscle_slug, primary_muscle_name, primary_muscle_category, muscle_map.
+    - grant select a anon y authenticated.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web despues del hotfix.
+
+### Gate operativo pendiente en remoto
+
+- Ejecutar supabase/migrations/0004_refresh_exercise_catalog_view.sql en SQL Editor remoto para alinear la vista y desactivar el camino de fallback.
+
+## 22) Ajuste de Ejecucion SQL para 0004 (2026-04-29)
+
+- Estado: aplicado en repo.
+- Incidente detectado al ejecutar 0004 en remoto:
+    - ERROR 42P16 cannot change name of view column stimulus_vector to movement_pattern.
+- Causa: CREATE OR REPLACE VIEW intento reemplazar una version legacy de v_exercise_catalog con orden/shape de columnas diferente.
+
+### Correccion aplicada
+
+- Archivo ajustado: supabase/migrations/0004_refresh_exercise_catalog_view.sql.
+- Cambio: reemplazo de estrategia a recreacion limpia:
+    - drop view if exists public.v_exercise_catalog;
+    - create view public.v_exercise_catalog as ...
+
+### Resultado esperado
+
+- La migracion 0004 puede ejecutarse sin conflicto de renombrado implicito de columnas.
+- El contrato final de v_exercise_catalog queda normalizado para Etapa 1.
+
+## 23) Remediacion Binding + Overhaul Athlete OS (2026-04-29)
+
+- Estado: aplicado en codigo y validado en runtime local.
+- Objetivo: corregir perdida de sinergistas en detalle y rehacer /lab/exercises con estetica Athlete OS de alto contraste.
+
+### Data Binding corregido
+
+- Archivo actualizado: apps/web/src/lib/lab/persistence.ts.
+- Mejoras aplicadas:
+        - parseMuscleMap ahora soporta JSONB como array y tambien payload serializado string.
+        - mapeo tolerante de claves legacy/alternas (slug o muscle_slug, name o muscle_name).
+        - deduplicacion por slug+role para evitar ruido en tags.
+        - route/page marcados force-dynamic y revalidate=0 para evitar stale cache:
+            - apps/web/src/app/api/lab/exercises/route.ts
+            - apps/web/src/app/(shell)/lab/exercises/page.tsx
+
+### UI/UX overhaul aplicado
+
+- Archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+- Cambios clave:
+        - tema dark high contrast (base zinc) y layout visual Athlete OS.
+        - chips inactivos bg-zinc-800 text-zinc-400 y activos bg-white text-black.
+        - ExerciseCard separado con fondo bg-zinc-900, border-zinc-800, rounded-xl.
+        - CNS badge agresivo por rango:
+            - menor a 5: cyan.
+            - 5 a 8: amber.
+            - mayor a 8: rojo con texto blanco.
+        - titulo de ejercicio reforzado con font-bold text-lg tracking-tight.
+        - ExerciseSheet separado con metricas en cajas solidas:
+            - bg-zinc-800/50 rounded-lg p-3 border border-white/5.
+        - tags tecnicos para primarios/sinergistas (uppercase tracking y borde/acento).
+
+### Script QA para sinergistas (5 ejercicios)
+
+- Archivo nuevo: supabase/migrations/0005_seed_exercise_synergists_sample.sql.
+- Inserta relaciones en exercise_muscles para pruebas visuales de Bottom Sheet en:
+        - back-squat
+        - barbell-bench-press
+        - barbell-row
+        - overhead-press
+        - romanian-deadlift
+
+### Evidencia
+
+- Typecheck verde: npm.cmd run typecheck.
+- Verificacion de UI en runtime local: Bottom Sheet muestra sinergistas (ejemplo back-squat con Core y Gluteo).
+
+## 24) Cierre Etapa 1 - Interfaz Elite de Datos (2026-04-29)
+
+- Estado: aplicado en codigo y validado.
+- Objetivo: convertir /lab/exercises en interfaz profesional de alta densidad, clara y orientada a lectura rapida para toma de decisiones.
+
+### Buscador Spotlight (Apple-like)
+
+- Archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+- Implementado:
+    - input centrado con backdrop-blur-md, bg-zinc-900/50 y borde sutil border-zinc-800.
+    - atajo Cmd+K / Ctrl+K para enfocar y seleccionar el buscador.
+    - filtrado realtime por nombre, musculo y patron.
+
+### Lista densa con headers sticky por patron
+
+- Estructura aplicada por fila:
+    - izquierda: nombre bold + musculo principal muted.
+    - derecha: badge de vector completo y luego indicador CNS con rayo.
+- Agrupamiento sticky por movement_pattern con conteo por bloque.
+
+### Semaforo CNS y badge de vector
+
+- Indicador CNS (Zap) con formato visual: ⚡ valor.
+- Rangos aplicados:
+    - mayor a 8.5: rojo/rosa neon.
+    - 5.0 a 8.4: naranja/ambar.
+    - menor a 5.0: cyan/verde neon.
+- Badges de vector con palabra completa:
+    - FUERZA, AMPLITUD, DENSIDAD, POTENCIA, ACONDICIONAMIENTO.
+
+### Intel Sheet data-heavy
+
+- Bottom sheet rehacido con enfoque tecnico:
+    - metricas en cards minimalistas.
+    - lista de primarios y sinergistas con tags tecnicos.
+    - fallback explicito cuando no hay sinergistas:
+      - Sin sinergistas registrados.
+
+### Gate tecnico y funcional
+
+- Typecheck en verde para @musculator/web.
+- Validacion manual:
+    - shortcut Ctrl+K enfoca buscador.
+    - headers sticky por patron visibles.
+    - sinergistas renderizados desde muscle_map y fallback textual correcto cuando vacio.
+
+## 25) Sistema de Filtrado Tactico (Anti-Bloat) (2026-04-29)
+
+- Estado: aplicado y validado en runtime.
+- Objetivo: aumentar control de exploracion sin ruido visual, manteniendo interfaz densa y legible.
+
+### Barra de filtros minimalista en header sticky
+
+- Archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+- Implementado debajo del buscador Spotlight:
+    - Patron: dropdown oscuro.
+    - Vector: dropdown oscuro.
+    - Equipamiento: dropdown oscuro (Barra, Mancuerna, Maquina, Cable).
+- Estetica anti-bloat:
+    - selectores textuales con ChevronDown.
+    - sin botones de fondo solido.
+    - menu compacto bg-zinc-900 y borde sutil.
+
+### Estado activo y feedback
+
+- Si un filtro != Todos, el label del filtro se resalta con acento (cyan) para visibilidad de contexto.
+- Contador dinamico mantenido y conectado a filtros + busqueda en tiempo real.
+
+### Performance de filtrado
+
+- Filtrado y agrupamiento calculados con useMemo para respuesta instantanea sobre 100+ ejercicios.
+- Cierre de dropdown por click externo y tecla Escape para interaccion limpia.
+
+### Refinamiento Intel Sheet
+
+- Header del sheet reagrupado.
+- Boton de cierre (X) mejor integrado con estilo circular definido:
+    - bg-zinc-800/50 y borde mas visible.
+
+### Evidencia funcional
+
+- Caso validado: Vector = FUERZA reduce listado a 13 ejercicios visibles y conserva agrupamiento sticky por patron.
