@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 interface MobileTabBarProps {
   activeTab: "profile" | "lab" | "nutrition";
   onSelectTab: (tab: "profile" | "lab" | "nutrition") => void;
@@ -18,6 +20,23 @@ export function MobileTabBar({ activeTab, onSelectTab, onOpenLive }: MobileTabBa
       <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-2">
         {tabs.map((tab) => {
           const active = activeTab === tab.id;
+
+          if (tab.id === "lab") {
+            return (
+              <Link
+                key={tab.id}
+                href="/lab/exercises"
+                className={`flex min-h-14 flex-col items-center justify-center rounded-[1.15rem] px-2 py-2 text-center transition ${
+                  active
+                    ? "bg-[#4cb894] text-slate-950"
+                    : "bg-white/6 text-white/72 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span className="text-[10px] uppercase tracking-[0.22em] opacity-70">{tab.eyebrow}</span>
+                <span className="mt-1 text-sm font-semibold">{tab.label}</span>
+              </Link>
+            );
+          }
 
           return (
             <button

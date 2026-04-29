@@ -870,3 +870,40 @@ Solo web:
 - Snapshot funcional validado para / con dashboard original restaurado.
 - Snapshot funcional validado para /lab/exercises sin regresiones.
 - Commit de cierre: 348dbd3 (fix(shell): restore pre-refactor home dashboard).
+
+## 32) Ajuste UX App-Like Home Perfil + Lab Nuevo (2026-04-29)
+
+- Estado: completada.
+- Objetivo: conservar Home con el perfil actual y hacer que Lab, desde Home, abra el nuevo /lab/exercises en navegacion cliente tipo app.
+
+### Cambios aplicados por etapas
+
+#### Etapa A - Preservacion de Home
+
+- Confirmado sin cambios funcionales en Home:
+    - se mantiene TrainingWorkspace como superficie principal en /.
+    - la experiencia de Perfil/telemetria permanece intacta.
+
+#### Etapa B - Enrutado de Lab al nuevo catalogo
+
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - boton superior Lab del dashboard ahora navega a /lab/exercises.
+    - selector local de superficies queda para profile/nutrition/clients.
+- Archivo actualizado: apps/web/src/components/training/mobile-tab-bar.tsx.
+    - tab Lab de la barra inferior pasa a Link cliente hacia /lab/exercises.
+    - Perfil y Nutricion siguen funcionando como tabs internos del workspace.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke funcional por etapas:
+    - / mantiene dashboard Home actual sin regresiones.
+    - click en tab Lab desde Home navega a /lab/exercises.
+    - /lab/exercises conserva el catalogo nuevo operativo.
+
+### Evidencia
+
+- Validacion de URL tras click en tab Lab desde Home: http://localhost:3000/lab/exercises.
+- Snapshot runtime en / con Perfil intacto.
+- Snapshot runtime en /lab/exercises tras navegacion desde Home.
+- Commit de cierre: pendiente de registrar tras commit.

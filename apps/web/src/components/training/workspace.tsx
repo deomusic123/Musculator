@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import {
   clientCreateResponseSchema,
   clientListResponseSchema,
@@ -680,12 +681,11 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   const athleteTitle = selectedClient?.fullName
     ? `PERFIL DEL ATLETA · ${selectedClient.fullName.toUpperCase()}`
     : "PERFIL DEL ATLETA · MODO PREVIEW";
-  const mobileActiveTab =
-    dashboardSurface === "lab"
-      ? "lab"
-      : dashboardSurface === "nutrition"
-        ? "nutrition"
-        : "profile";
+  const mobileActiveTab = dashboardSurface === "nutrition" ? "nutrition" : "profile";
+
+  const selectDashboardSurface = (surface: "profile" | "nutrition" | "clients") => {
+    setDashboardSurface(surface);
+  };
 
   const openReadinessSheet = () => {
     openSheet({
@@ -1391,7 +1391,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setDashboardSurface("profile")}
+                onClick={() => selectDashboardSurface("profile")}
                 className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
                   dashboardSurface === "profile"
                     ? "bg-[#4cb894] text-slate-950"
@@ -1400,20 +1400,15 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               >
                 Perfil del cliente
               </button>
-              <button
-                type="button"
-                onClick={() => setDashboardSurface("lab")}
-                className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
-                  dashboardSurface === "lab"
-                    ? "bg-[#4cb894] text-slate-950"
-                    : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
-                }`}
+              <Link
+                href="/lab/exercises"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/10 bg-white/6 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
               >
                 Lab
-              </button>
+              </Link>
               <button
                 type="button"
-                onClick={() => setDashboardSurface("nutrition")}
+                onClick={() => selectDashboardSurface("nutrition")}
                 className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
                   dashboardSurface === "nutrition"
                     ? "bg-[#4cb894] text-slate-950"
@@ -1424,7 +1419,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               </button>
               <button
                 type="button"
-                onClick={() => setDashboardSurface("clients")}
+                onClick={() => selectDashboardSurface("clients")}
                 className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
                   dashboardSurface === "clients"
                     ? "bg-[#4cb894] text-slate-950"
@@ -1459,7 +1454,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               </div>
               <button
                 type="button"
-                onClick={() => setDashboardSurface("clients")}
+                onClick={() => selectDashboardSurface("clients")}
                 className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
                   dashboardSurface === "clients"
                     ? "bg-[#4cb894] text-slate-950"
@@ -2462,7 +2457,16 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
           {dashboardSurface !== "clients" ? (
             <MobileTabBar
               activeTab={mobileActiveTab}
-              onSelectTab={setDashboardSurface}
+              onSelectTab={(tab) => {
+                if (tab === "profile") {
+                  selectDashboardSurface("profile");
+                  return;
+                }
+
+                if (tab === "nutrition") {
+                  selectDashboardSurface("nutrition");
+                }
+              }}
               onOpenLive={openLiveMode}
             />
           ) : null}
