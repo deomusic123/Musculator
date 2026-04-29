@@ -1145,3 +1145,167 @@ Solo web:
 
 - Home / en vista mobile mantiene tabs internas y contenido sin desborde horizontal global.
 - Perfil renderiza bloque hero y metrica principal sin cortes de texto por ancho.
+
+## 39) Rollback Refactor Home Legacy No Deseado (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: eliminar la vista legacy de perfil simplificado reintroducida por error y restaurar el dashboard operativo previo al ultimo refactor.
+
+### Correccion estructural aplicada
+
+- Se restaura Home principal en el route group original con el workspace completo:
+    - archivo restaurado: apps/web/src/app/(shell)/page.tsx.
+- Se elimina la ruta paralela experimental que generaba conflicto de estructura y desviaba a la vista no deseada:
+    - archivo eliminado: apps/web/src/app/(main)/page.tsx.
+- Se elimina el contenedor intermedio que montaba nuevamente ProfileDashboard legacy:
+    - archivo eliminado: apps/web/src/components/training/main-home.tsx.
+- Se revierte apps/web/src/components/training/workspace.tsx al contrato y navegacion previos:
+    - sin props de control externas (surface/onSurfaceChange/liveTrigger).
+    - barra mobile vuelve al flujo interno establecido del workspace.
+    - se restituye encabezado y selector de superficies originales.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+
+### Evidencia funcional
+
+- Home / vuelve a renderizar el dashboard completo con hero "PERFIL DEL ATLETA · MODO PREVIEW" (no la tarjeta legacy "PR Perfil del atleta").
+- Navegacion tab interna Perfil/Lab/Nutricion/Live operativa en la misma ruta raiz.
+
+## 40) Plan Maestro Refactor DDD + App Router (2026-04-29)
+
+- Estado: planificado (pendiente de ejecucion).
+- Objetivo: migrar desde mega-workspace client-heavy hacia arquitectura predecible por dominios, con limites estrictos entre lectura, forja y ejecucion live.
+
+### Decision tecnica base
+
+- Se adopta arquitectura Domain-Driven Routing con Route Groups:
+    - app/(main): dominio de lectura (telemetria/perfil).
+    - app/(lab): dominio de configuracion (forja/catalogo/rutinas).
+    - app/(live): dominio de ejecucion (sesion activa).
+- Regla de aislamiento: un dominio no puede importar superficies completas de otro dominio.
+- Se prioriza Server Components para pages/layouts y Client Components solo en hojas interactivas.
+
+### Ajustes al blueprint (validados para este repo)
+
+- Se adopta tal cual:
+    - Domain-Driven Routing por route groups.
+    - URL as State para filtros de Lab.
+    - Shell inquebrantable mobile-first con padding estructural en layout superior.
+- Se ajusta para evitar regresion:
+    - Zustand se limita solo a estado de sesion live (cronometro/indice set), no para Home/Lab.
+    - En Home no se embebe catalogo completo de Lab; se usa navegacion entre dominios.
+    - AppNav/MobileNav viven en shell compartido; los dominios solo inyectan contenido.
+
+### Etapas de ejecucion y gates
+
+#### Etapa M1 - Reestructuracion de rutas por dominio
+
+- Acciones:
+    - mover Home actual a app/(main)/page.tsx.
+    - mover superficies lab a app/(lab)/lab/* con layout dedicado y tabs.
+    - crear dominio live en app/(live)/live/page.tsx o app/(live)/session/*.
+    - mantener compatibilidad de URL publica actual (/ y /lab/*) sin ruptura funcional.
+- Gate tecnico:
+    - npm.cmd run typecheck en verde.
+    - sin errores de rutas paralelas en Next.
+- Evidencia esperada:
+    - arbol final de rutas en roadmap.
+    - checklist de navegacion /, /lab/exercises y /live.
+
+#### Etapa M2 - Separacion Server/Client estricta
+
+- Acciones:
+    - convertir pages/layouts de dominios a Server Components.
+    - dejar componentes client solo para interacciones (filtros, buscador, live timer, sheets).
+    - extraer fetch de datos a server boundaries por dominio.
+- Gate tecnico:
+    - pages/layouts sin "use client" salvo casos justificados.
+    - typecheck verde + smoke de hydration sin errores.
+- Evidencia esperada:
+    - inventario de componentes client por dominio y razon de interactividad.
+
+#### Etapa M3 - URL as State en Lab
+
+- Acciones:
+    - filtros de catalogo en query params (q, pattern, vector, equipment, cns).
+    - server page lee searchParams y resuelve dataset inicial en servidor.
+    - componente client solo controla UI de filtros y sincroniza URL.
+- Gate tecnico:
+    - /lab/exercises?q=press&vector=fuerza renderiza estado correcto al cargar/reload.
+    - navegacion back/forward conserva filtros.
+- Evidencia esperada:
+    - matriz de casos de filtros y URL resultante.
+
+#### Etapa M4 - Live Store aislado (Zustand)
+
+- Acciones:
+    - crear store minimo para sesion live (tiempo, set activo, flags de pausa).
+    - remover dependencia de estado live dentro del mega workspace.
+    - persistencia de seguridad opcional en sessionStorage para cortes de pantalla.
+- Gate tecnico:
+    - al recargar en live se conserva estado minimo de ejecucion.
+    - no hay estado global compartido con main/lab.
+- Evidencia esperada:
+    - prueba manual de continuidad de cronometro/set en live.
+
+#### Etapa M5 - App Shell inquebrantable
+
+- Acciones:
+    - root layout define solo body/proveedores/nav estructural.
+    - shell superior controla max-w, centrado, scroll y padding estructural.
+    - componentes internos quedan sin margenes estructurales globales.
+- Gate tecnico:
+    - sin overflow horizontal en 360/375/390/412 px.
+    - scroll y navegacion consistentes en /, /lab/* y /live.
+- Evidencia esperada:
+    - checklist de viewport mobile y snapshots de verificacion.
+
+### Regla operativa para ejecucion con IA
+
+- No se acepta implementacion por "parches" dentro de workspace.tsx.
+- Cada etapa cierra con:
+    - gate tecnico aprobado,
+    - evidencia documentada en roadmap,
+    - commit atomico con mensaje de etapa.
+
+## 41) Ejecucion Etapa M1 - Rutas por Dominio sin romper URL (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: establecer base Domain-Driven Routing con route groups (main/lab/live) manteniendo URLs publicas existentes.
+
+### Cambios aplicados
+
+- Dominio main (lectura) creado:
+        - archivo nuevo: apps/web/src/app/(main)/page.tsx.
+        - Home continua en URL / (sin cambio de path publico).
+- Dominio lab (forja) creado y aislado:
+        - archivos nuevos:
+            - apps/web/src/app/(lab)/lab/layout.tsx
+            - apps/web/src/app/(lab)/lab/page.tsx
+            - apps/web/src/app/(lab)/lab/exercises/page.tsx
+            - apps/web/src/app/(lab)/lab/templates/page.tsx
+            - apps/web/src/app/(lab)/lab/protocols/page.tsx
+        - Lab continua en URL /lab/* (sin cambio de path publico).
+- Dominio live preparado:
+        - archivo nuevo: apps/web/src/app/(live)/session/[id]/page.tsx.
+        - ruta publica /session/[id] preservada via route group.
+- Aislamiento inicial aplicado:
+        - eliminadas rutas duplicadas en app/(shell) que podian colisionar:
+            - apps/web/src/app/(shell)/page.tsx
+            - apps/web/src/app/(shell)/lab/**
+        - eliminado archivo legacy de sesion fuera de dominio live:
+            - apps/web/src/app/session/[id]/page.tsx
+
+### Gate tecnico M1
+
+- Compilacion sin errores de rutas duplicadas: aprobado.
+- Navegacion funcional en browser para / y /lab: aprobado.
+
+### Evidencia de cierre
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke runtime validado en servidor local:
+    - GET / responde Home de telemetria en http://localhost:3001/.
+    - GET /lab redirige correctamente a /lab/exercises y renderiza catalogo sin error.
