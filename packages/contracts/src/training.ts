@@ -4,7 +4,7 @@ export const workoutSourceSchema = z.enum(["manual", "text", "audio", "vision", 
 export const stimulusVectorSchema = z.enum([
   "amplitud",
   "densidad",
-  "fuerza_base",
+  "fuerza",
   "cardio_metabolico",
   "acondicionamiento",
   "potencia",
@@ -17,6 +17,7 @@ export const movementPatternSchema = z.enum([
   "vertical_pull",
   "knee_dominant",
   "hip_hinge",
+  "isolation",
   "core_anti_movement",
   "rotation_ballistic",
   "locomotion_metabolic",
@@ -26,8 +27,8 @@ export const resistanceProfileSchema = z.enum([
   "bodyweight",
   "free_weight",
   "cable",
-  "machine",
-  "specific",
+  "machine_constant",
+  "machine_variable",
 ]);
 
 export const workoutIntakeEntrySchema = z.object({

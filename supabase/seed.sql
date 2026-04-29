@@ -39,7 +39,7 @@ set
   equipment = excluded.equipment;
 
 insert into public.exercises (slug, name, primary_muscle_id, stimulus_vector, is_compound, equipment)
-select 'heavy-bag-round', 'Saco pesado', id, 'cardio_metabolico', true, 'Saco pesado'
+select 'heavy-bag-round', 'Saco pesado', id, 'acondicionamiento', true, 'Saco pesado'
 from public.muscle_groups
 where slug = 'core'
 on conflict (slug) do update
@@ -51,7 +51,7 @@ set
   equipment = excluded.equipment;
 
 insert into public.exercises (slug, name, primary_muscle_id, stimulus_vector, is_compound, equipment)
-select 'back-squat', 'Sentadilla trasera', id, 'fuerza_base', true, 'Barra'
+select 'back-squat', 'Sentadilla trasera', id, 'fuerza', true, 'Barra'
 from public.muscle_groups
 where slug = 'cuadriceps'
 on conflict (slug) do update

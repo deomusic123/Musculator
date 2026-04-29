@@ -779,6 +779,10 @@ export interface Database {
           muscle_name: string;
           category: string;
           recovery_time_hours: number;
+          role_weighted_sets: number;
+          average_cns_tax_multiplier: number;
+          average_stimulus_factor: number;
+          recovery_time_dynamic_hours: number;
           total_sets: number;
           total_reps: number;
           total_load_kg: number;
@@ -792,7 +796,7 @@ export interface Database {
       stimulus_vector:
         | "amplitud"
         | "densidad"
-        | "fuerza_base"
+        | "fuerza"
         | "cardio_metabolico"
         | "acondicionamiento"
         | "potencia";
@@ -803,6 +807,7 @@ export interface Database {
         | "vertical_pull"
         | "knee_dominant"
         | "hip_hinge"
+        | "isolation"
         | "core_anti_movement"
         | "rotation_ballistic"
         | "locomotion_metabolic";
@@ -810,8 +815,8 @@ export interface Database {
         | "bodyweight"
         | "free_weight"
         | "cable"
-        | "machine"
-        | "specific";
+        | "machine_constant"
+        | "machine_variable";
       training_session_kind: "strength" | "conditioning" | "hybrid";
       training_protocol_week_type: "build" | "intensification" | "deload" | "test";
       training_protocol_assignment_status: "draft" | "active" | "paused" | "completed";

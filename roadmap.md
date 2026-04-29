@@ -331,3 +331,140 @@ Solo web:
 - Entidades tipadas incluidas: clients, muscle_groups, exercises, exercise_muscles, training_templates, training_template_entries, training_template_sets, training_protocols, training_protocol_weeks, training_protocol_week_templates, client_protocol_assignments, workout_sessions, workout_entries, workout_sets, training_ingestions.
 - Vistas tipadas incluidas: v_exercise_catalog, v_workout_session_summary, v_workout_muscle_load.
 - Enums tipados incluidos: stimulus_vector, movement_pattern, resistance_profile, training_session_kind, training_protocol_week_type, training_protocol_assignment_status, ingestion_source, ingestion_status, muscle_role.
+
+## 16) Ejecucion Etapa 0.5 Camino 2 (2026-04-29)
+
+- Estado: avanzada en codigo local y lista para aplicacion SQL remota.
+- Objetivo aplicado: alinear taxonomia biomecanica base antes de construir catalogo UI del Lab.
+
+### Paso 1 - Migracion taxonomica (completado en repo)
+
+- Archivo creado: supabase/migrations/0002_biomechanics_taxonomy.sql.
+- Cambios cubiertos:
+    - movement_pattern: agrega isolation.
+    - stimulus_vector: renombra fuerza_base -> fuerza y asegura amplitud/densidad/potencia/acondicionamiento.
+    - resistance_profile: migra machine/specific hacia machine_constant/machine_variable/bodyweight y deja default free_weight.
+
+### Paso 2 - Resincronizacion de fuente de verdad y tipos (completado)
+
+- bootstrap actualizado: supabase/bootstrap_musculacion.sql.
+- Tipados/contratos alineados:
+    - apps/web/src/lib/platform/supabase-types.ts
+    - packages/contracts/src/training.ts
+    - packages/domain/src/training.ts
+    - apps/web/src/components/training/workspace.tsx
+    - supabase/seed.sql
+- Gate aprobado:
+    - npm.cmd run typecheck en verde en @musculator/contracts, @musculator/domain y @musculator/web.
+
+### Paso 3 - Seed de 80-100 ejercicios (completado en repo)
+
+- Archivo creado: supabase/seed_exercises.sql.
+- Cobertura final: 100 ejercicios con upsert por slug.
+- Ejes cubiertos:
+    - movement_pattern: horizontal_push, vertical_push, horizontal_pull, vertical_pull, knee_dominant, hip_hinge, isolation, core_anti_movement, rotation_ballistic, locomotion_metabolic.
+    - stimulus_vector operativo del seed: fuerza, amplitud, densidad, potencia, acondicionamiento.
+    - resistance_profile: bodyweight, free_weight, cable, machine_constant, machine_variable.
+
+### Bloqueador para cierre de etapa en base remota
+
+- Pendiente de ejecutar en Supabase remoto: aplicacion de 0002_biomechanics_taxonomy.sql y seed_exercises.sql.
+- Estado remoto verificado por API REST: public.exercises aun expone esquema viejo (sin movement_pattern, resistance_profile ni cns_tax_multiplier) y conteo actual 13 ejercicios.
+- Bloqueador actual: sin sesion activa en dashboard de Supabase desde este entorno y sin credenciales directas de Postgres para aplicar SQL remoto.
+- Hotfix aplicado (2026-04-29): 0002_biomechanics_taxonomy.sql ahora crea tipos faltantes si no existen (movement_pattern, stimulus_vector, resistance_profile), agrega columnas faltantes en exercises y protege alteraciones con guards de existencia para compatibilidad con esquema legacy.
+- Cierre operativo requerido para marcar etapa cerrada:
+    1. Ejecutar migracion 0002 en SQL Editor de Supabase.
+    2. Ejecutar seed_exercises.sql.
+    3. Validar conteo en public.exercises y registrar evidencia en este roadmap.
+
+## 17) Validacion Remota Etapa 0.5 (2026-04-29)
+
+- Estado: ejecutada y validada en Supabase remoto.
+- Scripts ejecutados en remoto por usuario:
+    - supabase/migrations/0002_biomechanics_taxonomy.sql
+    - supabase/seed_exercises.sql
+
+### Evidencia remota
+
+- Conteo remoto total en public.exercises: 101.
+- Cobertura movement_pattern (10): core_anti_movement, hip_hinge, horizontal_pull, horizontal_push, isolation, knee_dominant, locomotion_metabolic, rotation_ballistic, vertical_pull, vertical_push.
+- Cobertura stimulus_vector (5): acondicionamiento, amplitud, densidad, fuerza, potencia.
+- Cobertura resistance_profile (5): bodyweight, cable, free_weight, machine_constant, machine_variable.
+- Integridad de columnas nuevas en exercises:
+    - movement_pattern nulos: 0
+    - resistance_profile nulos: 0
+    - cns_tax_multiplier nulos: 0
+
+### Nota de consistencia seed vs remoto
+
+- Seed local contiene 100 slugs; remoto contiene 101 slugs.
+- Diferencia detectada: 1 slug legacy adicional en remoto (machine-fly), sin faltantes respecto al seed nuevo.
+
+## 18) Ajustes Fisiologicos y Recuperacion Dinamica (2026-04-29)
+
+- Estado: aplicado en repo para siguiente corrida SQL.
+- Objetivo: conservar taxonomia de 10 patrones y mantener recovery_time_hours como base muscular, agregando capa dinamica por sesion.
+
+### Cambios aplicados
+
+- Tuning puntual en seed de ejercicios (9 columnas sin cambios estructurales):
+    - barbell-bench-press: cns_tax_multiplier 9.1 -> 8.5.
+    - push-press: cns_tax_multiplier 9.2 -> 9.5.
+    - back-squat: cns_tax_multiplier 9.4 -> 10.0.
+    - bulgarian-split-squat: cns_tax_multiplier 7.2 -> 8.5.
+    - romanian-deadlift: stimulus_vector fuerza -> amplitud y cns_tax_multiplier 8.8 -> 9.5.
+    - conventional-deadlift: cns_tax_multiplier 9.6 -> 10.0.
+- Archivo actualizado: supabase/seed_exercises.sql.
+- Fuente bootstrap alineada en ejercicios compartidos: back-squat y romanian-deadlift.
+
+### Recuperacion dinamica implementada en SQL
+
+- Vista actualizada: v_workout_muscle_load (bootstrap + migracion).
+- Reglas incorporadas:
+    - Base muscular mantenida: recovery_time_hours.
+    - Ponderacion por rol muscular: primary 1.00, secondary 0.60, stabilizer 0.35.
+    - Factor de estimulo por stimulus_vector.
+    - Normalizacion de CNS para evitar multiplicacion directa descontrolada.
+    - Limites operativos de salida: minimo 18h y maximo 120h.
+- Nuevas salidas de vista:
+    - role_weighted_sets
+    - average_cns_tax_multiplier
+    - average_stimulus_factor
+    - recovery_time_dynamic_hours
+
+### Migracion puente creada
+
+- Archivo nuevo: supabase/migrations/0003_recovery_dynamic_and_seed_tuning.sql.
+- Alcance:
+    - UPDATE sobre slugs criticos para tuning fisiologico en entornos ya poblados.
+    - CREATE OR REPLACE de v_workout_muscle_load con la logica dinamica.
+
+### Tipado sincronizado
+
+- Archivo actualizado: apps/web/src/lib/platform/supabase-types.ts.
+- v_workout_muscle_load incluye columnas dinamicas nuevas para consumo seguro desde app/api.
+
+## 19) Validacion Remota Migracion 0003 (2026-04-29)
+
+- Estado: validada en Supabase remoto.
+- Script ejecutado: supabase/migrations/0003_recovery_dynamic_and_seed_tuning.sql.
+
+### Evidencia de estructura
+
+- v_workout_muscle_load expone contrato legacy + columnas nuevas sin romper compatibilidad.
+- Columnas observadas en remoto (14):
+    - session_id, user_id, muscle_slug, muscle_name, category, recovery_time_hours, total_sets, total_reps, total_load_kg, average_rpe, role_weighted_sets, average_cns_tax_multiplier, average_stimulus_factor, recovery_time_dynamic_hours.
+
+### Evidencia de tuning aplicado
+
+- back-squat: stimulus_vector fuerza, cns_tax_multiplier 10.0.
+- barbell-bench-press: stimulus_vector fuerza, cns_tax_multiplier 8.5.
+- bulgarian-split-squat: stimulus_vector amplitud, cns_tax_multiplier 8.5.
+- conventional-deadlift: stimulus_vector fuerza, cns_tax_multiplier 10.0.
+- push-press: stimulus_vector potencia, cns_tax_multiplier 9.5.
+- romanian-deadlift: stimulus_vector amplitud, cns_tax_multiplier 9.5.
+
+### Evidencia de recuperacion dinamica
+
+- Rango observado recovery_time_dynamic_hours: minimo 49h, maximo 91h.
+- Resultado consistente con limites operativos configurados (18h-120h).

@@ -40,7 +40,7 @@ const muscleTone = {
 const stimulusLabel = {
   amplitud: "Amplitud",
   densidad: "Densidad",
-  fuerza_base: "Fuerza base",
+  fuerza: "Fuerza",
   cardio_metabolico: "Cardio metabolico",
   acondicionamiento: "Acondicionamiento",
   potencia: "Potencia",

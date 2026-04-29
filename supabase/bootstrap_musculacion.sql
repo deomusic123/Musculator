@@ -15,16 +15,38 @@ begin
     create type public.stimulus_vector as enum (
       'amplitud',
       'densidad',
-      'fuerza_base',
+      'fuerza',
       'cardio_metabolico'
     );
   end if;
 end
 $$;
 
+do $$
+begin
+  if exists (
+    select 1
+    from pg_enum enum
+    join pg_type typ on typ.oid = enum.enumtypid
+    where typ.typnamespace = 'public'::regnamespace
+      and typ.typname = 'stimulus_vector'
+      and enum.enumlabel = 'fuerza_base'
+  ) and not exists (
+    select 1
+    from pg_enum enum
+    join pg_type typ on typ.oid = enum.enumtypid
+    where typ.typnamespace = 'public'::regnamespace
+      and typ.typname = 'stimulus_vector'
+      and enum.enumlabel = 'fuerza'
+  ) then
+    alter type public.stimulus_vector rename value 'fuerza_base' to 'fuerza';
+  end if;
+end
+$$;
+
 alter type public.stimulus_vector add value if not exists 'amplitud';
 alter type public.stimulus_vector add value if not exists 'densidad';
-alter type public.stimulus_vector add value if not exists 'fuerza_base';
+alter type public.stimulus_vector add value if not exists 'fuerza';
 alter type public.stimulus_vector add value if not exists 'cardio_metabolico';
 alter type public.stimulus_vector add value if not exists 'acondicionamiento';
 alter type public.stimulus_vector add value if not exists 'potencia';
@@ -44,6 +66,7 @@ begin
       'vertical_pull',
       'knee_dominant',
       'hip_hinge',
+      'isolation',
       'core_anti_movement',
       'rotation_ballistic',
       'locomotion_metabolic'
@@ -58,6 +81,7 @@ alter type public.movement_pattern add value if not exists 'horizontal_pull';
 alter type public.movement_pattern add value if not exists 'vertical_pull';
 alter type public.movement_pattern add value if not exists 'knee_dominant';
 alter type public.movement_pattern add value if not exists 'hip_hinge';
+alter type public.movement_pattern add value if not exists 'isolation';
 alter type public.movement_pattern add value if not exists 'core_anti_movement';
 alter type public.movement_pattern add value if not exists 'rotation_ballistic';
 alter type public.movement_pattern add value if not exists 'locomotion_metabolic';
@@ -74,8 +98,8 @@ begin
       'bodyweight',
       'free_weight',
       'cable',
-      'machine',
-      'specific'
+      'machine_constant',
+      'machine_variable'
     );
   end if;
 end
@@ -84,8 +108,8 @@ $$;
 alter type public.resistance_profile add value if not exists 'bodyweight';
 alter type public.resistance_profile add value if not exists 'free_weight';
 alter type public.resistance_profile add value if not exists 'cable';
-alter type public.resistance_profile add value if not exists 'machine';
-alter type public.resistance_profile add value if not exists 'specific';
+alter type public.resistance_profile add value if not exists 'machine_constant';
+alter type public.resistance_profile add value if not exists 'machine_variable';
 
 do $$
 begin
@@ -302,6 +326,61 @@ alter table public.exercises
 
 alter table public.exercises
   add column if not exists cns_tax_multiplier numeric(3,1) not null default 5.0;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'exercises'
+      and column_name = 'resistance_profile'
+  ) and exists (
+    select 1
+    from pg_enum enum
+    join pg_type typ on typ.oid = enum.enumtypid
+    where typ.typnamespace = 'public'::regnamespace
+      and typ.typname = 'resistance_profile'
+      and enum.enumlabel in ('machine', 'specific')
+  ) then
+    if exists (
+      select 1
+      from pg_type
+      where typnamespace = 'public'::regnamespace
+        and typname = 'resistance_profile_new'
+    ) then
+      drop type public.resistance_profile_new;
+    end if;
+
+    create type public.resistance_profile_new as enum (
+      'bodyweight',
+      'free_weight',
+      'cable',
+      'machine_constant',
+      'machine_variable'
+    );
+
+    alter table public.exercises
+      alter column resistance_profile drop default;
+
+    alter table public.exercises
+      alter column resistance_profile type public.resistance_profile_new
+      using (
+        case resistance_profile::text
+          when 'machine' then 'machine_constant'
+          when 'specific' then 'bodyweight'
+          else resistance_profile::text
+        end
+      )::public.resistance_profile_new;
+
+    drop type public.resistance_profile;
+    alter type public.resistance_profile_new rename to resistance_profile;
+
+    alter table public.exercises
+      alter column resistance_profile set default 'free_weight'::public.resistance_profile;
+  end if;
+end
+$$;
 
 create table if not exists public.training_templates (
   id uuid primary key default gen_random_uuid(),
@@ -943,17 +1022,17 @@ with exercise_seed as (
     values
       ('barbell-row', 'Remo con barra', 'dorsal', 'horizontal_pull', 'densidad', 'free_weight', true, 'Barra', 7.8),
       ('lat-pulldown', 'Jalon al pecho', 'dorsal', 'vertical_pull', 'amplitud', 'cable', false, 'Polea', 5.2),
-      ('incline-bench-press', 'Press inclinado', 'pectoral', 'horizontal_push', 'fuerza_base', 'free_weight', true, 'Barra', 8.4),
-      ('machine-fly', 'Aperturas en maquina', 'pectoral', 'horizontal_push', 'amplitud', 'machine', false, 'Maquina', 3.8),
-      ('overhead-press', 'Press militar', 'deltoides-anterior', 'vertical_push', 'fuerza_base', 'free_weight', true, 'Barra', 8.1),
-      ('lateral-raise', 'Elevacion lateral', 'deltoides-lateral', 'vertical_push', 'amplitud', 'free_weight', false, 'Mancuernas', 2.9),
-      ('back-squat', 'Sentadilla trasera', 'cuadriceps', 'knee_dominant', 'fuerza_base', 'free_weight', true, 'Barra', 9.4),
-      ('romanian-deadlift', 'Peso muerto rumano', 'femoral', 'hip_hinge', 'amplitud', 'free_weight', true, 'Barra', 8.7),
-      ('leg-press', 'Prensa inclinada', 'cuadriceps', 'knee_dominant', 'densidad', 'machine', true, 'Maquina', 6.8),
+      ('incline-bench-press', 'Press inclinado', 'pectoral', 'horizontal_push', 'fuerza', 'free_weight', true, 'Barra', 8.4),
+      ('machine-fly', 'Aperturas en maquina', 'pectoral', 'isolation', 'amplitud', 'machine_constant', false, 'Maquina', 3.8),
+      ('overhead-press', 'Press militar', 'deltoides-anterior', 'vertical_push', 'fuerza', 'free_weight', true, 'Barra', 8.1),
+      ('lateral-raise', 'Elevacion lateral', 'deltoides-lateral', 'isolation', 'amplitud', 'free_weight', false, 'Mancuernas', 2.9),
+      ('back-squat', 'Sentadilla trasera', 'cuadriceps', 'knee_dominant', 'fuerza', 'free_weight', true, 'Barra', 10.0),
+      ('romanian-deadlift', 'Peso muerto rumano', 'femoral', 'hip_hinge', 'amplitud', 'free_weight', true, 'Barra', 9.5),
+      ('leg-press', 'Prensa inclinada', 'cuadriceps', 'knee_dominant', 'densidad', 'machine_constant', true, 'Maquina', 6.8),
       ('hip-thrust', 'Hip thrust', 'gluteo', 'hip_hinge', 'densidad', 'free_weight', true, 'Barra', 7.1),
-      ('barbell-curl', 'Curl con barra', 'biceps', 'horizontal_pull', 'amplitud', 'free_weight', false, 'Barra', 2.6),
-      ('rope-pushdown', 'Pushdown en cuerda', 'triceps', 'vertical_push', 'densidad', 'cable', false, 'Polea', 2.4),
-      ('heavy-bag-rounds', 'Saco de boxeo', 'core', 'locomotion_metabolic', 'acondicionamiento', 'specific', false, 'Saco', 6.1)
+      ('barbell-curl', 'Curl con barra', 'biceps', 'isolation', 'amplitud', 'free_weight', false, 'Barra', 2.6),
+      ('rope-pushdown', 'Pushdown en cuerda', 'triceps', 'isolation', 'densidad', 'cable', false, 'Polea', 2.4),
+      ('heavy-bag-rounds', 'Saco de boxeo', 'core', 'locomotion_metabolic', 'acondicionamiento', 'bodyweight', false, 'Saco', 6.1)
   ) as seed(slug, name, primary_muscle_slug, movement_pattern, stimulus_vector, resistance_profile, is_compound, equipment, cns_tax_multiplier)
 )
 insert into public.exercises (
@@ -1074,11 +1153,11 @@ with template_entry_seed as (
       ('pull-density', 'barbell-row', null, 0, 4, 10, 10, 72.50, null, 8.0, 'densidad', 'Back-off pesado para dorsal y trapecio.'),
       ('pull-density', 'lat-pulldown', null, 1, 3, 12, 12, 55.00, null, 8.0, 'amplitud', 'Compensa con amplitud y rango completo.'),
       ('pull-density', 'barbell-curl', null, 2, 3, 12, 12, 30.00, null, 8.0, 'amplitud', 'Cierra con accesorio de biceps.'),
-      ('push-hypertrophy', 'incline-bench-press', null, 0, 3, 8, 8, 70.00, null, 8.0, 'fuerza_base', null),
+      ('push-hypertrophy', 'incline-bench-press', null, 0, 3, 8, 8, 70.00, null, 8.0, 'fuerza', null),
       ('push-hypertrophy', 'machine-fly', null, 1, 3, 15, 15, 40.00, null, 8.0, 'amplitud', null),
       ('push-hypertrophy', 'lateral-raise', null, 2, 3, 15, 15, 10.00, null, 8.0, 'amplitud', null),
       ('push-hypertrophy', 'rope-pushdown', null, 3, 3, 15, 15, 25.00, null, 8.0, 'densidad', null),
-      ('legs-strength', 'back-squat', null, 0, 3, 6, 6, 110.00, null, 8.0, 'fuerza_base', null),
+      ('legs-strength', 'back-squat', null, 0, 3, 6, 6, 110.00, null, 8.0, 'fuerza', null),
       ('legs-strength', 'romanian-deadlift', null, 1, 3, 8, 8, 90.00, null, 8.0, 'densidad', null),
       ('legs-strength', 'leg-press', null, 2, 3, 12, 12, 220.00, null, 8.0, 'densidad', null),
       ('legs-strength', 'hip-thrust', null, 3, 3, 10, 10, 120.00, null, 8.0, 'densidad', null),
@@ -1381,36 +1460,98 @@ group by workout_sessions.id;
 create or replace view public.v_workout_muscle_load
 with (security_invoker = true)
 as
+with role_enriched as (
+  select
+    workout_sessions.id as session_id,
+    workout_sessions.user_id,
+    muscle_groups.slug as muscle_slug,
+    muscle_groups.name as muscle_name,
+    muscle_groups.category,
+    muscle_groups.recovery_time_hours,
+    workout_sets.reps,
+    workout_sets.weight_kg,
+    workout_sets.rpe,
+    exercises.cns_tax_multiplier,
+    case exercise_muscles.role
+      when 'primary' then 1.00
+      when 'secondary' then 0.60
+      when 'stabilizer' then 0.35
+      else 0.50
+    end::numeric as role_weight,
+    case exercises.stimulus_vector
+      when 'amplitud' then 1.18
+      when 'fuerza' then 1.08
+      when 'potencia' then 1.12
+      when 'acondicionamiento' then 0.94
+      when 'cardio_metabolico' then 0.92
+      else 1.00
+    end::numeric as stimulus_factor
+  from public.workout_sessions
+  join public.workout_entries
+    on workout_entries.session_id = workout_sessions.id
+  join public.exercises
+    on exercises.id = workout_entries.exercise_id
+  join public.exercise_muscles
+    on exercise_muscles.exercise_id = exercises.id
+    and exercise_muscles.role in ('primary', 'secondary', 'stabilizer')
+  join public.muscle_groups
+    on muscle_groups.id = exercise_muscles.muscle_group_id
+  join public.workout_sets
+    on workout_sets.entry_id = workout_entries.id
+),
+aggregated as (
+  select
+    session_id,
+    user_id,
+    muscle_slug,
+    muscle_name,
+    category,
+    recovery_time_hours,
+    count(*) as total_sets,
+    coalesce(sum(reps), 0) as total_reps,
+    coalesce(sum(coalesce(reps, 0) * coalesce(weight_kg, 0)), 0)::numeric(12,2) as total_load_kg,
+    round(coalesce(avg(rpe), 0)::numeric, 1) as average_rpe,
+    coalesce(sum(role_weight), 0)::numeric as role_weighted_sets,
+    coalesce(sum(cns_tax_multiplier * role_weight) / nullif(sum(role_weight), 0), 5.0)::numeric as average_cns_tax_multiplier,
+    coalesce(sum(stimulus_factor * role_weight) / nullif(sum(role_weight), 0), 1.0)::numeric as average_stimulus_factor
+  from role_enriched
+  group by
+    session_id,
+    user_id,
+    muscle_slug,
+    muscle_name,
+    category,
+    recovery_time_hours
+)
 select
-  workout_sessions.id as session_id,
-  workout_sessions.user_id,
-  muscle_groups.slug as muscle_slug,
-  muscle_groups.name as muscle_name,
-  muscle_groups.category,
-  muscle_groups.recovery_time_hours,
-  count(workout_sets.id) as total_sets,
-  coalesce(sum(workout_sets.reps), 0) as total_reps,
-  coalesce(sum(coalesce(workout_sets.reps, 0) * coalesce(workout_sets.weight_kg, 0)), 0)::numeric(12,2) as total_load_kg,
-  round(coalesce(avg(workout_sets.rpe), 0)::numeric, 1) as average_rpe
-from public.workout_sessions
-join public.workout_entries
-  on workout_entries.session_id = workout_sessions.id
-join public.exercises
-  on exercises.id = workout_entries.exercise_id
-join public.exercise_muscles
-  on exercise_muscles.exercise_id = exercises.id
-  and exercise_muscles.role in ('primary', 'secondary', 'stabilizer')
-join public.muscle_groups
-  on muscle_groups.id = exercise_muscles.muscle_group_id
-join public.workout_sets
-  on workout_sets.entry_id = workout_entries.id
-group by
-  workout_sessions.id,
-  workout_sessions.user_id,
-  muscle_groups.slug,
-  muscle_groups.name,
-  muscle_groups.category,
-  muscle_groups.recovery_time_hours;
+  session_id,
+  user_id,
+  muscle_slug,
+  muscle_name,
+  category,
+  recovery_time_hours,
+  total_sets,
+  total_reps,
+  total_load_kg,
+  average_rpe,
+  round(role_weighted_sets, 2) as role_weighted_sets,
+  round(average_cns_tax_multiplier, 2) as average_cns_tax_multiplier,
+  round(average_stimulus_factor, 2) as average_stimulus_factor,
+  greatest(
+    18,
+    least(
+      120,
+      round(
+        recovery_time_hours
+        * greatest(
+          0.85,
+          least(1.30, 1 + ((average_cns_tax_multiplier - 5.0) / 5.0) * 0.30)
+        )
+        * average_stimulus_factor
+      )
+    )
+  )::integer as recovery_time_dynamic_hours
+from aggregated;
 
 grant select on public.v_exercise_catalog to anon, authenticated;
 grant select on public.v_workout_session_summary to authenticated;
