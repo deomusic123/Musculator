@@ -1123,3 +1123,25 @@ Solo web:
 
 - Se restablece flujo app movil continuo en Perfil/Home con scroll utilizable.
 - Se mantiene arquitectura single-app por tabs internas (Perfil/Lab/Nutricion/Live) en la ruta raiz.
+
+## 38) Hardening de Fit Visual Mobile (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: eliminar recortes visuales residuales en Home/Perfil para que el layout entre completo en pantallas angostas sin navegacion horizontal.
+
+### Ajustes aplicados
+
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se agrega min-w-0 en contenedores clave del dashboard para evitar ensanche por contenido interno.
+    - hero principal mobile reduce densidad (padding, radio y avatar) para evitar clipping lateral.
+    - heading del perfil pasa a break-words y escala responsiva (text-2xl -> sm:text-3xl -> md:text-5xl).
+    - header mobile superior endurecido con truncate/min-w-0/shrink-0 para evitar empuje de layout por boton Clientes.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+
+### Evidencia funcional
+
+- Home / en vista mobile mantiene tabs internas y contenido sin desborde horizontal global.
+- Perfil renderiza bloque hero y metrica principal sin cortes de texto por ancho.

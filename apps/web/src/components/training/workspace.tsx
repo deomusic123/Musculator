@@ -1446,9 +1446,9 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
 
           <section className="border-b border-white/8 bg-[#08111a] px-4 py-4 md:hidden">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-white/42">Musculator app</p>
-                <h1 className="mt-1 text-xl font-semibold text-white">
+                <h1 className="mt-1 truncate text-xl font-semibold text-white">
                   {dashboardSurface === "profile"
                     ? "Perfil"
                     : dashboardSurface === "lab"
@@ -1461,7 +1461,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               <button
                 type="button"
                 onClick={() => selectDashboardSurface("clients")}
-                className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-3 py-2 text-sm font-medium transition ${
                   dashboardSurface === "clients"
                     ? "bg-[#4cb894] text-slate-950"
                     : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
@@ -1480,16 +1480,16 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="grid gap-6"
+              className="grid min-w-0 gap-6"
             >
 
           {dashboardSurface === "profile" ? (
             <>
-              <section>
-                <article className="relative overflow-hidden rounded-[2.6rem] border border-white/8 bg-[#09111b] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)] md:p-8">
+              <section className="min-w-0">
+                <article className="relative overflow-visible rounded-[2.2rem] border border-white/8 bg-[#09111b] p-4 shadow-[0_24px_80px_rgba(2,6,23,0.35)] sm:rounded-[2.6rem] sm:p-6 md:overflow-hidden md:p-8">
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(76,184,148,0.18),transparent_0_28%),radial-gradient(circle_at_80%_18%,rgba(56,189,248,0.14),transparent_0_28%),radial-gradient(circle_at_50%_100%,rgba(245,158,11,0.1),transparent_0_36%)]" />
-                  <div className="relative grid gap-6">
-                    <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative grid min-w-0 gap-5 sm:gap-6">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                       <span className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-xs uppercase tracking-[0.22em] text-white/55">
                         Athlete OS
                       </span>
@@ -1501,13 +1501,13 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                       </span>
                     </div>
 
-                    <div className="grid gap-6 lg:grid-cols-[auto_1fr] lg:items-end">
+                    <div className="grid min-w-0 gap-5 sm:gap-6 lg:grid-cols-[auto_1fr] lg:items-end">
                       <div className="flex flex-col items-center gap-4">
                         <div
-                          className="flex h-30 w-30 items-center justify-center rounded-full border-4 bg-[#0d1724] text-4xl font-semibold text-white shadow-[0_0_50px_rgba(0,0,0,0.28)]"
+                          className="flex h-24 w-24 items-center justify-center rounded-full border-4 bg-[#0d1724] text-3xl font-semibold text-white shadow-[0_0_35px_rgba(0,0,0,0.24)] sm:h-30 sm:w-30 sm:text-4xl sm:shadow-[0_0_50px_rgba(0,0,0,0.28)]"
                           style={{
                             borderColor: readinessPalette[analysis.readiness.status].solid,
-                            boxShadow: `0 0 0 10px ${readinessPalette[analysis.readiness.status].soft}`,
+                            boxShadow: `0 0 0 7px ${readinessPalette[analysis.readiness.status].soft}`,
                           }}
                         >
                           {selectedClient?.fullName.slice(0, 2).toUpperCase() ?? "MU"}
@@ -1515,10 +1515,10 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                         <p className="text-[11px] uppercase tracking-[0.22em] text-white/42">telemetria en vivo</p>
                       </div>
 
-                      <div className="grid gap-5">
+                      <div className="grid min-w-0 gap-4 sm:gap-5">
                         <div>
                           <p className="text-sm uppercase tracking-[0.24em] text-white/42">Perfil y telemetria</p>
-                          <h1 className="mt-3 text-3xl font-semibold leading-tight text-white md:text-5xl">{athleteTitle}</h1>
+                          <h1 className="mt-3 break-words text-2xl font-semibold leading-tight text-white sm:text-3xl md:text-5xl">{athleteTitle}</h1>
                           <p className="mt-3 max-w-3xl text-base leading-7 text-white/62">
                             {selectedClient
                               ? selectedClient.goal ?? "Todavia no hay un objetivo principal definido para este atleta."
@@ -1526,7 +1526,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                           </p>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           <div className="rounded-[1.45rem] border border-white/10 bg-white/6 px-4 py-4">
                             <p className="text-[11px] uppercase tracking-[0.2em] text-white/42">Edad</p>
                             <p className="mt-2 text-xl font-semibold text-white">{age} años</p>
