@@ -869,4 +869,4 @@ Solo web:
 
 - Snapshot funcional validado para / con dashboard original restaurado.
 - Snapshot funcional validado para /lab/exercises sin regresiones.
-- Commit de cierre: pendiente de registrar tras commit.
+- Commit de cierre: 348dbd3 (fix(shell): restore pre-refactor home dashboard).
