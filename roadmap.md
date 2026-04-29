@@ -214,3 +214,120 @@ Solo web:
 - Cero recarga en navegación diaria.
 - Datos primero (persistencia + contratos), visual después.
 - Cambios por etapas y commits pequeños para estabilidad.
+
+## 14) Plan Tactico Analitica Pro Desde Lab (2026-04-29)
+
+- Objetivo: ejecutar la opcion Analitica Pro con orden estricto, arrancando por infraestructura de Ejercicios y Rutinas antes de conectar Perfil Pro.
+- Regla de secuencia: no se avanza de etapa sin gate de salida aprobado y evidencia registrada.
+
+### Etapa 0 (Deuda Tecnica Bloqueante)
+
+- Meta: sincronizar supabase-types.ts con el esquema SQL real (tablas, vistas, enums y relaciones usadas por Lab y workspace).
+- Archivos y rutas a tocar primero:
+    - apps/web/src/lib/platform/supabase-types.ts
+    - supabase/bootstrap_musculacion.sql (fuente de verdad para el tipado)
+    - supabase/migrations/0001_initial_schema.sql (compatibilidad historica)
+- Alcance minimo obligatorio:
+    - Tables: clients, muscle_groups, exercises, exercise_muscles, training_templates, training_template_entries, training_template_sets, training_protocols, training_protocol_weeks, training_protocol_week_templates, client_protocol_assignments, workout_sessions, workout_entries, workout_sets, training_ingestions.
+    - Views: v_exercise_catalog, v_workout_session_summary, v_workout_muscle_load.
+    - Enums: stimulus_vector, movement_pattern, resistance_profile, training_session_kind, training_protocol_week_type, training_protocol_assignment_status, ingestion_source, ingestion_status, muscle_role.
+- Gate de salida:
+    - Typecheck completo en verde.
+    - Sin casts ad hoc para tablas/vistas del Lab.
+    - Queries del Lab compilando con tipos concretos.
+- Evidencia:
+    - Resultado de npm run typecheck.
+    - Lista de entidades tipadas actualizada en este roadmap.
+
+### Etapa 1 (Catalogo Lab UI/UX)
+
+- Meta: convertir /lab/exercises en catalogo real, navegable y filtrable por ejes biomecanicos y carga neural.
+- Rutas/componentes a tocar primero:
+    - apps/web/src/app/(shell)/lab/exercises/page.tsx
+    - apps/web/src/components/lab/lab-tabs.tsx
+    - apps/web/src/app/(shell)/lab/layout.tsx
+- Backend/BFF a crear o ajustar:
+    - app/api/lab/exercises/route.ts (lectura paginada y filtros server-side desde v_exercise_catalog)
+    - lib/training o lib/lab/persistence.ts para consulta tipada del catalogo.
+- Filtros obligatorios:
+    - Patrones: movement_pattern.
+    - Vector: stimulus_vector.
+    - Equipamiento/perfil: equipment y resistance_profile.
+    - CNS Tax: cns_tax_multiplier en rangos (ej: 1-3, 4-6, 7-10).
+    - Busqueda por slug/nombre/musculo.
+- Gate de salida:
+    - /lab/exercises renderiza datos reales.
+    - Filtros combinables funcionando sin recarga total.
+    - Estado vacio y estado error resueltos.
+- Evidencia:
+    - Capturas o checklist funcional de filtros.
+    - Conteo real de ejercicios retornados por API.
+
+### Etapa 2 (Constructor de Templates)
+
+- Meta: crear constructor en /lab/templates para armar rutinas desde catalogo real y calcular costo neural estimado en tiempo real.
+- Rutas/componentes a tocar primero:
+    - apps/web/src/app/(shell)/lab/templates/page.tsx
+    - apps/web/src/app/(shell)/lab/exercises/page.tsx (selector reutilizable o panel lateral)
+    - components/lab/* nuevos: builder de plantilla, lista de entradas, editor de sets.
+- Backend/BFF a crear o ajustar:
+    - app/api/lab/templates/route.ts (GET/POST)
+    - app/api/lab/templates/[id]/route.ts (GET/PATCH)
+    - Persistencia para training_templates, training_template_entries, training_template_sets.
+- Regla de calculo inicial (v1):
+    - Costo neural estimado por template = suma de (sets objetivo por ejercicio x cns_tax_multiplier del ejercicio).
+    - Mostrar semaforo operativo (bajo/medio/alto) y desglose por ejercicio.
+- Gate de salida:
+    - Crear/editar template persistido en SQL.
+    - Costo neural actualizado en vivo al agregar/quitar/editar ejercicios.
+    - Recuperacion del template consistente al recargar.
+- Evidencia:
+    - Template guardado con entries y sets.
+    - Valor de costo neural visible y trazable por ejercicio.
+
+### Etapa 3 (Perfil Pro)
+
+- Precondicion estricta: Etapas 0, 1 y 2 cerradas con gates aprobados.
+- Meta: conectar analitica pro en perfil usando datos estructurados reales de Lab + historial por cliente.
+- Archivos/rutas a tocar primero:
+    - apps/web/src/components/training/workspace.tsx
+    - apps/web/src/lib/training/persistence.ts
+    - app/api/training/sessions/route.ts
+    - app/api/clients/route.ts
+- Integraciones de visualizacion:
+    - Radar: balance por patrones/vectores comparando carga real vs objetivo de bloque/template.
+    - Heatmap: consistencia + intensidad + soporte metabolico.
+    - Cards: readiness, costo neural semanal, gap de recuperacion nutricional.
+- Gate de salida:
+    - Perfil muestra relaciones conectadas entre CNS Tax, Patrones, Recuperacion y Macros.
+    - Analitica derivada de datos persistidos por cliente, no placeholders.
+    - Smoke funcional completo en Perfil, Lab y Live.
+- Evidencia:
+    - Demo con cliente real y sesiones guardadas.
+    - Validacion de coherencia entre SQL, API y UI.
+
+### Orden operativo recomendado (primeras intervenciones)
+
+1. Tipado Supabase (Etapa 0).
+2. Endpoint y persistencia de catalogo (inicio Etapa 1).
+3. UI filtros de /lab/exercises (cierre Etapa 1).
+4. Endpoint y persistencia de templates (inicio Etapa 2).
+5. UI builder y costo neural en /lab/templates (cierre Etapa 2).
+6. Conexiones analiticas en workspace perfil (Etapa 3).
+
+## 15) Ejecucion Etapa 0 (2026-04-29)
+
+- Estado: completada.
+- Alcance ejecutado: sincronizacion de apps/web/src/lib/platform/supabase-types.ts con el esquema real de supabase/bootstrap_musculacion.sql para tablas, vistas y enums del dominio Lab + Training.
+
+### Gate de salida
+
+- Typecheck completo en verde: npm.cmd run typecheck.
+- Sin regresiones de compilacion en @musculator/contracts, @musculator/domain y @musculator/web.
+
+### Evidencia
+
+- Archivo tipado actualizado: apps/web/src/lib/platform/supabase-types.ts.
+- Entidades tipadas incluidas: clients, muscle_groups, exercises, exercise_muscles, training_templates, training_template_entries, training_template_sets, training_protocols, training_protocol_weeks, training_protocol_week_templates, client_protocol_assignments, workout_sessions, workout_entries, workout_sets, training_ingestions.
+- Vistas tipadas incluidas: v_exercise_catalog, v_workout_session_summary, v_workout_muscle_load.
+- Enums tipados incluidos: stimulus_vector, movement_pattern, resistance_profile, training_session_kind, training_protocol_week_type, training_protocol_assignment_status, ingestion_source, ingestion_status, muscle_role.
