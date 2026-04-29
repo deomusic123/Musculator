@@ -1309,3 +1309,53 @@ Solo web:
 - Smoke runtime validado en servidor local:
     - GET / responde Home de telemetria en http://localhost:3001/.
     - GET /lab redirige correctamente a /lab/exercises y renderiza catalogo sin error.
+
+## 42) Ejecucion Etapa M2 - Separacion Server/Client estricta (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: mover carga inicial de datos del dominio main al server boundary y dejar el cliente enfocado en interaccion/refresh incremental.
+
+### Cambios aplicados
+
+- Boundary server en dominio main:
+    - archivo actualizado: apps/web/src/app/(main)/page.tsx.
+    - Home ahora resuelve en servidor bootstrap inicial de clientes + historial con:
+        - listClients()
+        - listTrainingSessions()
+    - TrainingWorkspace recibe bootstrap server-side en primer render.
+- Aislamiento en cliente (workspace):
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se agrega contrato TrainingWorkspaceBootstrapData para estado inicial hidratado.
+    - se inicializan clients/selectedClientId/history/storageMode desde bootstrap server-side.
+    - se evita fetch inicial de clientes cuando existe bootstrap.
+    - se evita fetch inicial duplicado de historial cuando selectedClientId coincide con bootstrap.
+    - el cliente conserva fetch solo para interacciones reales (cambio de cliente, guardado de sesion, alta de cliente).
+
+### Gate tecnico M2
+
+- Pages/layouts de app sin "use client": aprobado.
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+- Smoke runtime de hydration/navegacion:
+    - GET / 200: aprobado.
+    - GET /lab/exercises 200: aprobado.
+
+### Inventario Client Components por dominio (M2)
+
+- Dominio main:
+    - apps/web/src/components/training/workspace.tsx: estado interactivo del dashboard y acciones de sesion.
+    - apps/web/src/components/training/mobile-tab-bar.tsx: control tactil de tabs internas.
+    - apps/web/src/components/training/intake-form.tsx: formulario interactivo de ingesta.
+- Dominio lab:
+    - apps/web/src/components/lab/exercise-catalog.tsx: buscador/filtros y experiencia interactiva del catalogo.
+    - apps/web/src/components/lab/embedded-exercise-catalog.tsx: selector embebido interactivo.
+    - apps/web/src/components/lab/lab-tabs.tsx: tabs de navegacion interna del dominio lab.
+- Shell compartido:
+    - apps/web/src/components/navigation/app-nav.tsx: navegacion client-side de shell.
+    - apps/web/src/components/navigation/mobile-route-nav.tsx: navegacion mobile de rutas.
+
+### Evidencia de cierre
+
+- Home main renderiza dashboard funcional en http://localhost:3002/ con datos iniciales hidratados desde servidor.
+- Lab mantiene funcionamiento en http://localhost:3002/lab/exercises.
+- Warning detectado (preexistente y no bloqueante para M2):
+    - Unsupported metadata themeColor en / y /lab/exercises (pendiente de mover a viewport export).

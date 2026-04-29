@@ -19,7 +19,7 @@ import {
   trainingExerciseCatalog,
   trainingTemplates,
 } from "@musculator/domain";
-import { startTransition, useDeferredValue, useEffect, useState, useTransition, type ReactNode } from "react";
+import { startTransition, useDeferredValue, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { EmbeddedExerciseCatalog } from "@/components/lab/embedded-exercise-catalog";
 import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
 import type { SetupCheck } from "@/lib/platform/setup";
@@ -568,15 +568,25 @@ function StepperPill({
 interface TrainingWorkspaceProps {
   initialSession: TrainingSessionDraft;
   integrations: SetupCheck[];
+  bootstrap?: TrainingWorkspaceBootstrapData;
 }
 
-export function TrainingWorkspace({ initialSession, integrations }: TrainingWorkspaceProps) {
+export interface TrainingWorkspaceBootstrapData {
+  storageMode: "supabase" | "noop";
+  clients: ClientProfile[];
+  selectedClientId: string | null;
+  history: PersistedTrainingSessionSummary[];
+}
+
+export function TrainingWorkspace({ initialSession, integrations, bootstrap }: TrainingWorkspaceProps) {
   const { openSheet } = useGlobalOverlay();
   const [session, setSession] = useState(initialSession);
   const [mode, setMode] = useState<"dashboard" | "live">("dashboard");
   const [dashboardSurface, setDashboardSurface] = useState<"profile" | "lab" | "nutrition" | "clients">("profile");
-  const [clients, setClients] = useState<ClientProfile[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [clients, setClients] = useState<ClientProfile[]>(bootstrap?.clients ?? []);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(
+    bootstrap?.selectedClientId ?? null,
+  );
   const [clientForm, setClientForm] = useState({
     fullName: "",
     goal: "",
@@ -595,11 +605,12 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   const [isSaving, startSavingTransition] = useTransition();
   const [isCreatingClient, startClientTransition] = useTransition();
   const [isRefreshingHistory, startHistoryTransition] = useTransition();
-  const [history, setHistory] = useState<PersistedTrainingSessionSummary[]>([]);
-  const [storageMode, setStorageMode] = useState<"supabase" | "noop">("noop");
+  const [history, setHistory] = useState<PersistedTrainingSessionSummary[]>(bootstrap?.history ?? []);
+  const [storageMode, setStorageMode] = useState<"supabase" | "noop">(bootstrap?.storageMode ?? "noop");
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedHeatmapDay, setSelectedHeatmapDay] = useState<string | null>(null);
+  const skippedBootstrapHistory = useRef(false);
 
   const deferredSession = useDeferredValue(session);
   const analysis = analyzeTrainingSession(deferredSession);
@@ -937,7 +948,9 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
       setSelectedClientId(storedClientId);
     }
 
-    refreshClients();
+    if (!bootstrap) {
+      refreshClients();
+    }
   }, []);
 
   useEffect(() => {
@@ -949,6 +962,15 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   }, [selectedClientId]);
 
   useEffect(() => {
+    if (
+      bootstrap &&
+      !skippedBootstrapHistory.current &&
+      selectedClientId === bootstrap.selectedClientId
+    ) {
+      skippedBootstrapHistory.current = true;
+      return;
+    }
+
     refreshHistory();
   }, [selectedClientId]);
 
