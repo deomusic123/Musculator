@@ -16,7 +16,11 @@ const navItems = [
   },
 ];
 
-const surfaceItems = ["Nutrition", "Health", "Arquitectura"];
+const shortcutItems = [
+  { href: "/lab/exercises", label: "Ejercicios", badge: "lab" },
+  { href: "/lab/templates", label: "Rutinas", badge: "lab" },
+  { href: "/lab/protocols", label: "Protocolos", badge: "lab" },
+] as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") {
@@ -63,18 +67,27 @@ export function AppNav() {
       </nav>
 
       <div className="mt-8 rounded-[1.5rem] border border-[var(--border)] bg-white/65 p-4">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">Superficies</p>
+        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">Atajos de dominio</p>
         <div className="mt-4 grid gap-2">
-          {surfaceItems.map((item) => (
-            <div
-              key={item}
-              className="flex items-center justify-between rounded-[1.1rem] border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-3 text-sm text-[var(--ink)]"
+          {shortcutItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center justify-between rounded-[1.1rem] border px-3 py-3 text-sm transition ${
+                isActive(pathname, item.href)
+                  ? "border-slate-950 bg-slate-950 text-white"
+                  : "border-[var(--border)] bg-[var(--surface-strong)] text-[var(--ink)] hover:bg-white"
+              }`}
             >
-              <span>{item}</span>
-              <span className="rounded-full bg-slate-950 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/80">
-                shell
+              <span>{item.label}</span>
+              <span className={`rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.16em] ${
+                isActive(pathname, item.href)
+                  ? "bg-white/15 text-white"
+                  : "bg-slate-950 text-white/80"
+              }`}>
+                {item.badge}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

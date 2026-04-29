@@ -569,6 +569,7 @@ interface TrainingWorkspaceProps {
   initialSession: TrainingSessionDraft;
   integrations: SetupCheck[];
   bootstrap?: TrainingWorkspaceBootstrapData;
+  initialSurface?: DashboardSurface;
 }
 
 export interface TrainingWorkspaceBootstrapData {
@@ -578,11 +579,18 @@ export interface TrainingWorkspaceBootstrapData {
   history: PersistedTrainingSessionSummary[];
 }
 
-export function TrainingWorkspace({ initialSession, integrations, bootstrap }: TrainingWorkspaceProps) {
+export type DashboardSurface = "profile" | "lab" | "nutrition" | "clients";
+
+export function TrainingWorkspace({
+  initialSession,
+  integrations,
+  bootstrap,
+  initialSurface = "profile",
+}: TrainingWorkspaceProps) {
   const { openSheet } = useGlobalOverlay();
   const [session, setSession] = useState(initialSession);
   const [mode, setMode] = useState<"dashboard" | "live">("dashboard");
-  const [dashboardSurface, setDashboardSurface] = useState<"profile" | "lab" | "nutrition" | "clients">("profile");
+  const [dashboardSurface, setDashboardSurface] = useState<DashboardSurface>(initialSurface);
   const [clients, setClients] = useState<ClientProfile[]>(bootstrap?.clients ?? []);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(
     bootstrap?.selectedClientId ?? null,
@@ -692,10 +700,7 @@ export function TrainingWorkspace({ initialSession, integrations, bootstrap }: T
   const athleteTitle = selectedClient?.fullName
     ? `PERFIL DEL ATLETA · ${selectedClient.fullName.toUpperCase()}`
     : "PERFIL DEL ATLETA · MODO PREVIEW";
-  const mobileActiveTab =
-    dashboardSurface === "nutrition" ? "nutrition" : dashboardSurface === "lab" ? "lab" : "profile";
-
-  const selectDashboardSurface = (surface: "profile" | "lab" | "nutrition" | "clients") => {
+  const selectDashboardSurface = (surface: DashboardSurface) => {
     setDashboardSurface(surface);
   };
 
@@ -940,6 +945,10 @@ export function TrainingWorkspace({ initialSession, integrations, bootstrap }: T
       }
     });
   };
+
+  useEffect(() => {
+    setDashboardSurface(initialSurface);
+  }, [initialSurface]);
 
   useEffect(() => {
     const storedClientId = window.localStorage.getItem("musculator:selected-client-id");
@@ -2500,22 +2509,6 @@ export function TrainingWorkspace({ initialSession, integrations, bootstrap }: T
 
           {dashboardSurface !== "clients" ? (
             <MobileTabBar
-              activeTab={mobileActiveTab}
-              onSelectTab={(tab) => {
-                if (tab === "profile") {
-                  selectDashboardSurface("profile");
-                  return;
-                }
-
-                if (tab === "lab") {
-                  selectDashboardSurface("lab");
-                  return;
-                }
-
-                if (tab === "nutrition") {
-                  selectDashboardSurface("nutrition");
-                }
-              }}
               onOpenLive={openLiveMode}
             />
           ) : null}

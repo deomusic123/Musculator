@@ -1359,3 +1359,45 @@ Solo web:
 - Lab mantiene funcionamiento en http://localhost:3002/lab/exercises.
 - Warning detectado (preexistente y no bloqueante para M2):
     - Unsupported metadata themeColor en / y /lab/exercises (pendiente de mover a viewport export).
+
+## 43) Cierre de Requisito Pendiente M2 - Navegacion route-based en TabBar + Sidebar (2026-04-29)
+
+- Estado: completada.
+- Motivo: cierre del requerimiento faltante en M2 para eliminar callbacks de estado local en navegacion principal y usar Links nativos con estado activo por pathname.
+
+### Cambios aplicados
+
+- MobileTabBar migrada a routing nativo:
+    - archivo actualizado: apps/web/src/components/training/mobile-tab-bar.tsx.
+    - se elimina prop onSelectTab y el cambio local de superficie por callback.
+    - tabs ahora usan Link con href reales:
+        - Perfil -> /
+        - Lab -> /lab
+        - Nutricion -> /?surface=nutrition
+    - estado activo calculado con usePathname (y surface query para Nutricion).
+- Workspace desacoplado de callback local en barra mobile:
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se elimina wiring de onSelectTab hacia selectDashboardSurface.
+    - se agrega soporte de initialSurface route-driven para sincronizar superficie inicial desde URL.
+- Main domain page alinea estado inicial desde URL:
+    - archivo actualizado: apps/web/src/app/(main)/page.tsx.
+    - searchParams se resuelve en servidor para derivar initialSurface y pasarlo a TrainingWorkspace.
+- Sidebar global con atajos por ruta:
+    - archivo actualizado: apps/web/src/components/navigation/app-nav.tsx.
+    - bloque de superficies estaticas reemplazado por Links a:
+        - /lab/exercises
+        - /lab/templates
+        - /lab/protocols
+    - estado activo visual basado en usePathname.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Evidencia funcional
+
+- MobileTabBar renderiza elementos como links (no botones de callback) en runtime.
+- Navegacion validada:
+    - click en Nutricion -> URL /?surface=nutrition y heading "Nutricion" activo.
+    - click en Lab -> transicion a /lab/exercises.
+- Sidebar global expone atajos route-based con estado activo por pathname.
