@@ -16,7 +16,7 @@ export function SignInForm({ enabled }: SignInFormProps) {
   const [isPending, startTransition] = useTransition();
   const nextParam = searchParams.get("next");
 
-  const nextPath = nextParam && nextParam.startsWith("/") ? nextParam : "/dashboard";
+  const nextPath = nextParam && nextParam.startsWith("/") ? nextParam : "/";
 
   const handleSubmit = async (formData: FormData) => {
     const submittedEmail = String(formData.get("email") ?? "").trim();

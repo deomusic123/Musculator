@@ -20,10 +20,10 @@ const surfaceItems = ["Nutrition", "Health", "Arquitectura"];
 
 function isActive(pathname: string, href: string) {
   if (href === "/") {
-    return pathname === "/" || pathname.startsWith("/dashboard");
+    return pathname === "/";
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === href || pathname.startsWith(`${href}/`) || (href === "/lab" && pathname === "/dashboard");
 }
 
 export function AppNav() {

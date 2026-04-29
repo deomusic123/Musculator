@@ -793,4 +793,55 @@ Solo web:
 
 - Snapshot funcional de / con barra mobile route-based activa.
 - Snapshot funcional de /lab/exercises con shell + tabs + catalogo operativo.
-- Commit de cierre R2: pendiente de registrar tras commit.
+- Commit de cierre R2: 309622b (refactor(nav): stage r2 route-based mobile shell nav).
+
+## 29) Ejecucion Etapa R3 - Limpieza estructural final y compatibilidad (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: se elimina ambiguedad de /dashboard como Home, se alinean enlaces legacy y se normalizan defaults de auth con la nueva jerarquia.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/app/(shell)/dashboard/page.tsx.
+    - /dashboard ahora redirige a /lab (compatibilidad legacy orientada a Lab).
+- Archivo actualizado: apps/web/src/components/navigation/site-header.tsx.
+    - enlaces "Training Lab" y CTA pasan de /dashboard a /lab.
+- Archivo actualizado: apps/web/src/components/navigation/app-nav.tsx.
+    - Home activo solo en /.
+    - compatibilidad visual para alias /dashboard tratandolo como Lab.
+- Archivo actualizado: apps/web/src/components/navigation/mobile-route-nav.tsx.
+    - misma logica de activo que desktop para / y /lab.
+- Archivos actualizados de auth:
+    - apps/web/src/app/sign-in/page.tsx
+    - apps/web/src/app/auth/callback/route.ts
+    - apps/web/src/components/auth/sign-in-form.tsx
+    - fallback de redireccion pasa a / (sin dependencia de /dashboard).
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke manual en runtime:
+    - /dashboard redirige a /lab/exercises.
+    - / mantiene Home de perfil/telemetria.
+    - /lab/exercises, /lab/templates y /lab/protocols operativos bajo shell comun + nav mobile route-based.
+
+### Evidencia
+
+- Snapshots funcionales validados para /, /dashboard, /lab/exercises, /lab/templates y /lab/protocols.
+- Commit de cierre R3: pendiente de registrar tras commit.
+
+## 30) Cierre Refactor Home-Lab por Etapas (2026-04-29)
+
+- Estado: completado.
+- Resultado:
+    - Home / separada de Lab administrativo.
+    - Lab centralizado en /lab/* con layout y tabs por rutas reales.
+    - Navegacion mobile/desktop unificada en rutas principales.
+    - Compatibilidad legacy controlada via redireccion de /dashboard hacia /lab.
+    - Defaults de auth alineados a / para evitar acoplamiento con alias legacy.
+
+### Commits de ejecucion
+
+- R1: eb9e9c4 - refactor(shell): stage r1 home profile-only surface.
+- R2: 309622b - refactor(nav): stage r2 route-based mobile shell nav.
+- R3: pendiente de registrar tras commit.

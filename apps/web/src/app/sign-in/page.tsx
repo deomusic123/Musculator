@@ -10,7 +10,7 @@ export default async function SignInPage() {
   const session = await getSessionState();
 
   if (session.user) {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   const checklist = getSetupChecklist();

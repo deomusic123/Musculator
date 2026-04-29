@@ -3,7 +3,7 @@ import { createServerSupabaseClient, getSessionState } from "@/lib/platform/supa
 
 function getSafeNextPath(candidate: string | null) {
   if (!candidate || !candidate.startsWith("/")) {
-    return "/dashboard";
+    return "/";
   }
 
   return candidate;
