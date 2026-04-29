@@ -1401,3 +1401,37 @@ Solo web:
     - click en Nutricion -> URL /?surface=nutrition y heading "Nutricion" activo.
     - click en Lab -> transicion a /lab/exercises.
 - Sidebar global expone atajos route-based con estado activo por pathname.
+
+## 44) Unificacion Home + Lab sin perdida de funcionalidad (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: mantener Home actual y Lab terminado, pero unificar shell visual/navegacion y suavizar transiciones entre rutas para eliminar salto brusco.
+
+### Cambios aplicados
+
+- Shell de Lab alineado al lenguaje visual de Home:
+    - archivo actualizado: apps/web/src/components/navigation/app-shell.tsx.
+    - se migra layout de Lab a base oscura y espaciado estructural consistente con Home.
+    - se mantiene intacto el contenido funcional de catalogo/rutinas/protocolos.
+- Tabs de Lab alineadas al mismo sistema de pills del dashboard:
+    - archivo actualizado: apps/web/src/components/lab/lab-tabs.tsx.
+    - estilos activos/inactivos unificados con acento verde y superficies oscuras.
+- Navbar mobile de Lab unificada con Home:
+    - archivo actualizado: apps/web/src/components/navigation/mobile-route-nav.tsx.
+    - se conserva navegacion por rutas reales y se adopta el mismo formato visual de barra inferior de Home.
+    - se agregan accesos Perfil/Lab/Nutricion + CTA Live manteniendo arquitectura route-based.
+- Transiciones de pagina suavizadas entre dominios:
+    - archivo nuevo: apps/web/src/components/navigation/route-transition.tsx.
+    - archivo actualizado: apps/web/src/app/layout.tsx.
+    - se envuelve el arbol de rutas con AnimatePresence + motion para fade/slide corto al navegar entre / y /lab/*.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Evidencia funcional
+
+- Home mantiene dashboard actual sin regresiones (mismo contenido y flujo principal).
+- Lab mantiene catalogo completo y tabs administrativas operativas.
+- En mobile, Home y Lab comparten el mismo lenguaje de navbar inferior y estado activo coherente.
+- Navegacion comprobada entre / y /lab/exercises sin perdida de estado funcional en cada dominio.

@@ -13,7 +13,7 @@ export function LabTabs() {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-wrap gap-2 rounded-[1.6rem] border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[0_20px_60px_rgba(20,33,43,0.06)]">
+    <div className="flex flex-wrap gap-2 rounded-[1.6rem] border border-white/10 bg-[#08111a] p-3 text-white shadow-[0_24px_80px_rgba(2,6,23,0.24)]">
       {tabs.map((tab) => {
         const active = pathname === tab.href;
 
@@ -23,8 +23,8 @@ export function LabTabs() {
             href={tab.href}
             className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
               active
-                ? "bg-slate-950 text-white"
-                : "border border-[var(--border)] bg-white/70 text-[var(--muted)] hover:bg-white"
+                ? "bg-[#4cb894] text-slate-950"
+                : "border border-white/10 bg-white/6 text-white/75 hover:bg-white/10 hover:text-white"
             }`}
           >
             {tab.label}

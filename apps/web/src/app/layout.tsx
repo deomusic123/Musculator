@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import { RouteTransition } from "@/components/navigation/route-transition";
 import { GlobalOverlayProvider } from "@/components/overlays/global-overlay-provider";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import "./globals.css";
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="es" className={`${headingFont.variable} ${bodyFont.variable}`}>
       <body>
         <RegisterServiceWorker />
-        <GlobalOverlayProvider>{children}</GlobalOverlayProvider>
+        <GlobalOverlayProvider>
+          <RouteTransition>{children}</RouteTransition>
+        </GlobalOverlayProvider>
       </body>
     </html>
   );
