@@ -1,111 +1,216 @@
-Tenés toda la razón, mala mía intentando simular el archivo. Al ser un modelo de IA de texto, no puedo generar archivos descargables directamente, pero sí puedo darte la estructura en Markdown perfecta para que la copies y pegues.
+# Musculator Roadmap Vivo (Estado Real del Repositorio)
 
-Este es el documento maestro completo. Te sugiero guardarlo como `arquitectura_base.md` (o usar partes para tu `.cursorrules`) en la raíz de tu proyecto para que tu entorno de *vibecoding* tenga el contexto absoluto.
+Documento de contexto operativo para continuar el proyecto en cualquier PC sin perder decisiones del chat.
 
-***
+## 1) Estado Actual
 
-# Documento de Arquitectura Base: Sistema Integral de Rendimiento Humano
+- Proyecto monorepo en npm workspaces con foco actual en musculacion (auth no bloqueante para el flujo principal).
+- Frontend principal en Next.js App Router con TypeScript estricto y Tailwind CSS 4.
+- Persistencia real en Supabase para clientes y sesiones de entrenamiento.
+- Dashboard evolucionado a experiencia tipo app:
+    - SPA por paneles internos (sin recarga para cambiar vista).
+    - Navegacion tipo tabs (Perfil, Lab, Nutricion, Live).
+    - Modo live inmersivo.
+    - Base PWA configurada (manifest + service worker).
+- Git configurado y sincronizado con:
+    - origin: https://github.com/deomusic123/Musculator.git
+    - rama principal: main
 
-## 1. Visión del Producto y Filosofía de Desarrollo
-El objetivo es construir una webapp (con potencial pivot a React Native/Expo para aprovechar hardware avanzado) que unifique el registro nutricional de alta precisión y el seguimiento biomecánico hiper-granular del entrenamiento. 
+## 2) Arquitectura de Código
 
-**Filosofía de Desarrollo:**
-* **Vibecoding y Agilidad:** Maximizar el uso de asistentes de IA (Cursor/Windsurf) manteniendo la "fuente de verdad" estrictamente definida en el esquema de base de datos.
-* **Fricción Cero en UX:** El ingreso de datos debe ser casi invisible. La IA y el hardware (NLP para entrenamiento, Visión/LiDAR para nutrición) deben hacer el trabajo pesado.
-* **Prevención de Feature Bloat:** Enfocarse en datos precisos y lógica relacional estricta, postergando visualizaciones complejas (como 3D) en favor de dashboards analíticos rápidos (SVG, Radares).
+### Monorepo
 
----
+- apps/web: aplicación Next.js.
+- packages/contracts: esquemas y tipos compartidos (Zod + tipos runtime-safe).
+- packages/domain: lógica de negocio de entrenamiento/readiness.
+- supabase: SQL de bootstrap, migraciones y seed.
+- n8n: prompts/base para orquestación NLP.
 
-## 2. Stack Tecnológico Core
-* **Frontend / Cliente:** Next.js (PWA) o React Native (Expo) con TypeScript. TailwindCSS para estilos. Recharts para analítica.
-* **Backend / BaaS:** Supabase (PostgreSQL, Auth, Storage, Edge Functions).
-* **Base de Datos Vectorial:** extensión `pgvector` nativa en Supabase para búsqueda semántica.
-* **Orquestación y Automatización:** n8n (self-hosted o Cloud).
-* **Modelos de IA:**
-    * *Visión:* API de Qwen-VL, LLaVA o modelos fundacionales (OpenAI/Claude) para el MVP.
-    * *NLP:* Whisper (OpenAI) para transcripción de audio + LLM ligero para formateo JSON.
+### Capas
 
----
+- contracts: validación de payloads y contratos API.
+- domain: cálculo de readiness, analítica de sesiones, catálogos.
+- web/lib: adaptadores de entorno y persistencia.
+- app/api: endpoints para clientes, sesiones e ingesta.
 
-## 3. Módulo 1: Nutrición Automatizada (Enfoque MVP)
-El MVP descarta la estimación volumétrica puramente computacional (nubes de puntos 2D) para garantizar precisión absoluta desde el día uno.
+## 3) UX y Navegación (Implementado)
 
-**Arquitectura del Flujo de Ingesta:**
-1.  **Captura y Clasificación:** El usuario toma una foto del plato. Un modelo de visión identifica los componentes (ej. `["Pechuga de pollo", "Arroz", "Brócoli"]`).
-2.  **Resolución de Peso (Híbrido):** * *Vía A (PWA/Web):* Interfaz de fricción cero donde el usuario ingresa manualmente los gramos al lado de cada alimento detectado.
-    * *Vía B (Expo/iOS Pro):* Utilización de ARKit/LiDAR para calcular el volumen ($cm^3$) en tiempo real y cruzarlo con una tabla de densidades para autocompletar el peso.
-3.  **Búsqueda Semántica:** Supabase Edge Functions toma los alimentos detectados, genera sus *embeddings* y busca en `pgvector` el *match* nutricional más exacto en la base de datos (Open Food Facts + USDA).
+### Shell móvil estilo app
 
----
+- Contenedor principal mobile-first con altura de viewport y scroll interno.
+- Cambio de panel por estado local (SPA) en lugar de navegación de ruta para el flujo diario.
+- Barra inferior móvil dedicada en:
+    - Perfil
+    - Lab
+    - Nutricion
+    - Boton Live
 
-## 4. Módulo 2: Registro Biomecánico de Entrenamiento
-El sistema requiere diferenciar estímulos dentro del mismo grupo muscular (ej. amplitud vs. densidad en la espalda) y gestionar la fatiga residual de un volumen alto (ej. 5 días por semana alternando pesas y asaltos de boxeo).
+### Vistas
 
-### Esquema Relacional Core (Supabase DDL)
-Este es el motor del módulo. Debe ser la primera pieza a construir.
+- Nivel 1 (tabs): Perfil, Lab, Nutricion.
+- Clientes: vista dedicada de ABM, separada del perfil.
+- Live: experiencia inmersiva de ejecución de sesión.
 
-```sql
--- Habilitar UUIDs
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+### Detalles en overlays
 
--- TABLA DE MÚSCULOS (Core Anatómico)
-CREATE TABLE muscle_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL UNIQUE, -- Ej: Dorsal, Trapecio, Deltoides Lateral
-    category TEXT NOT NULL, -- Ej: Espalda, Hombro
-    recovery_time_hours INTEGER DEFAULT 48
-);
+- Cards clave abren detalle en sheet/dialog, evitando cambios de página.
+- Sheet adaptado para móvil como bottom sheet (hasta 90% alto).
 
--- TABLA DE EJERCICIOS (Taxonomía Biomecánica)
-CREATE TABLE exercises (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL UNIQUE,
-    primary_muscle_id UUID REFERENCES muscle_groups(id),
-    stimulus_vector TEXT CHECK (stimulus_vector IN ('amplitud', 'densidad', 'fuerza_base', 'cardio_metabolico')),
-    is_compound BOOLEAN DEFAULT false, -- Clave para cálculo de fatiga del SNC
-    equipment TEXT -- Ej: Barra, Mancuerna, Saco pesado, Guantes 16oz
-);
+### Transiciones
 
--- REGISTRO DE ENTRENAMIENTOS (Log transaccional)
-CREATE TABLE workout_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id),
-    exercise_id UUID REFERENCES exercises(id),
-    sets INTEGER,
-    reps INTEGER,
-    weight_kg DECIMAL,
-    duration_minutes INTEGER, -- Útil para asaltos de saco/cardio
-    rpe INTEGER CHECK (rpe BETWEEN 1 AND 10),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+- AnimatePresence y motion para transición entre paneles internos.
 
----
+## 4) PWA (Base lista)
 
-## 5. Orquestación NLP: Fricción Cero en la Entrada de Datos
-El usuario no utilizará formularios manuales para registrar sus rutinas.
+### Manifest
 
-**Flujo Operativo (Implementado en n8n):**
-1.  **Trigger:** El frontend envía un archivo de audio (o texto) al Webhook de n8n.
-2.  **Transcripción:** Nodo de Whisper convierte el audio a texto.
-3.  **Extracción de Entidades (LLM):** Un nodo con un modelo de lenguaje procesa el texto usando el siguiente *System Prompt*:
-    > "Actúa como un extractor de datos de entrenamiento biomecánico. El usuario enviará un reporte informal de su sesión (ej: 'Hice 4x10 en remo con barra pesado RPE 9 y luego 5 asaltos en el saco'). Tu objetivo es mapear esto a un JSON estructurado que coincida con la tabla 'workout_logs'. Si detectas entrenamiento de boxeo o saco, mapea los asaltos como 'sets' y la duración como 'duration_minutes'. Devuelve estrictamente un array JSON válido."
-4.  **Inserción:** n8n formatea la salida y hace un INSERT directo en Supabase mediante la API REST.
+- display: standalone
+- orientation: portrait-primary
+- theme_color: #0F172A
+- background_color: #0F172A
+- icono inicial SVG maskable.
 
----
+### Service Worker
 
-## 6. Lógica de Negocio y Motor de Fatiga (El Puente)
-En lugar de matemáticas complejas de laboratorio, el MVP utilizará un sistema de **"Readiness Score" (Puntuación de Preparación)** basado en tonelaje y recuperación por horas.
+- Registro de SW en cliente.
+- SW base placeholder (instalación/activación/listener de fetch).
+- Pendiente hardening de estrategia de caché offline.
 
-* **Fatiga Periférica (Local):** Cada registro de un `muscle_group` activa un temporizador basado en su `recovery_time_hours`. En el frontend, un mapa de calor anatómico (SVG) colorea el músculo en rojo y lo degrada a verde según pasan las horas.
-* **Fatiga del SNC (Sistema Nervioso Central):** Cuando se registran ejercicios con `is_compound: true` (ej. sentadillas pesadas o asaltos intensos de boxeo) combinados con un `RPE > 8`, el sistema aplica un debuff global al *Readiness Score*.
-* **Integridad Nutricional:** Si el *Readiness Score* está por debajo del umbral óptimo (fatiga alta del SNC), la aplicación sugiere proactivamente un aumento en la ingesta de carbohidratos en el Módulo de Nutrición para forzar la reposición de glucógeno.
+## 5) Supabase y Persistencia
 
----
+### Variables de entorno clave (NO commitear secretos)
 
-## 7. Roadmap de Ejecución (Sugerido para Desarrollo Ágil)
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- SUPABASE_DEV_EMAIL
+- SUPABASE_DEV_DISPLAY_NAME
 
-* **Hito 1: Backend Fundacional.** Ejecutar esquemas SQL en Supabase (Nutrición y Entrenamiento). Configurar RLS (Row Level Security).
-* **Hito 2: El Pipeline NLP.** Levantar el flujo en n8n, conectar Whisper y probar enviar audios de prueba ("4x12 en jalón al pecho") hasta que los logs aparezcan mágicamente en Supabase.
-* **Hito 3: UX/UI Core.** Configurar proyecto base (Next.js/Expo). Implementar subida de foto y renderizado de resultados con campos de input numérico.
-* **Hito 4: Analítica.** Implementar gráficos de radar con Recharts para visualizar el balance de vectores (Amplitud vs Densidad) y el SVG interactivo para el mapa de calor de fatiga.
+Notas:
+
+- Usar apps/web/.env.example como plantilla.
+- .env.local debe permanecer local.
+
+### Entidades principales
+
+- clients: propietario lógico de historial y decisiones por persona.
+- workout_sessions / workout_entries / workout_sets.
+- estructuras extendidas de templates/protocolos/catalogo biomecánico.
+
+### SQL relevante
+
+- supabase/bootstrap_musculacion.sql
+- supabase/migrations/0001_initial_schema.sql
+- supabase/seed.sql
+
+## 6) Rutas y Superficies
+
+- /: dashboard principal (TrainingWorkspace).
+- /dashboard: alias a /.
+- /lab/*: superficie administrativa de lab.
+- /session/[id]: ruta de sesión aislada.
+
+## 7) Archivos Clave
+
+### App y shell
+
+- apps/web/src/app/layout.tsx
+- apps/web/src/app/(shell)/page.tsx
+- apps/web/src/components/navigation/app-nav.tsx
+
+### Workspace y navegación interna
+
+- apps/web/src/components/training/workspace.tsx
+- apps/web/src/components/training/mobile-tab-bar.tsx
+- apps/web/src/components/overlays/global-overlay-provider.tsx
+
+### PWA
+
+- apps/web/src/app/manifest.ts
+- apps/web/src/components/pwa/register-sw.tsx
+- apps/web/public/sw.js
+- apps/web/public/icons/icon.svg
+
+### Dominio/contratos
+
+- packages/contracts/src/training.ts
+- packages/domain/src/training.ts
+- packages/domain/src/readiness.ts
+
+### Persistencia/API
+
+- apps/web/src/lib/training/persistence.ts
+- apps/web/src/lib/client/persistence.ts
+- apps/web/src/app/api/training/sessions/route.ts
+- apps/web/src/app/api/clients/route.ts
+
+## 8) Flujo de Trabajo Git (Estable para rollback)
+
+### Convención usada
+
+- Commits por etapa funcional para rollback quirúrgico.
+- Push frecuente a main para backup remoto continuo.
+
+### Commits de referencia recientes
+
+- 7611ad5 feat: bootstrap musculator training workspace
+- 8acd5ef feat(web): add mobile spa training shell
+- 98ec71d feat(web): add animated panel transitions and mobile sheets
+- 1d51621 feat(web): configure pwa manifest and service worker
+
+## 9) Setup en Nueva PC
+
+1. Clonar el repo.
+2. Instalar Node >= 22.
+3. Ejecutar npm install en la raíz.
+4. Copiar apps/web/.env.example a apps/web/.env.local y completar variables.
+5. Ejecutar:
+     - npm run typecheck
+     - npm run dev --workspace @musculator/web
+6. Abrir http://localhost:3000 o puerto disponible.
+
+## 10) Comandos Útiles
+
+- npm run dev
+- npm run build
+- npm run lint
+- npm run typecheck
+
+Solo web:
+
+- npm run dev --workspace @musculator/web
+- npm run typecheck --workspace @musculator/web
+
+## 11) Riesgos Conocidos y Decisiones
+
+- El modo live intenta fullscreen, pero depende de soporte/permisos del navegador.
+- El SW actual es base: sirve para instalación, no para offline robusto.
+- El estado del workspace sigue grande en un solo componente; conviene modularizar por feature slice.
+
+## 12) Próximas Etapas Prioritarias
+
+### Etapa A: PWA hardening
+
+- Estrategia de caché (app shell + assets + fallback offline).
+- Íconos PNG 192/512.
+- Prompt de instalación y control de updates.
+
+### Etapa B: Modularización workspace
+
+- Extraer perfil/lab/nutricion/live a componentes por dominio.
+- Reducir tamaño de workspace.tsx y mejorar testabilidad.
+
+### Etapa C: Lab real
+
+- Reemplazar skeletons de /lab por ABM real de templates/protocolos/catálogo.
+
+### Etapa D: Live conectado extremo a extremo
+
+- Unificar ruta /session/[id] con estado persistido y acciones de guardado/recuperación en caliente.
+
+## 13) Principios de Producto Vigentes
+
+- Mobile-first real, sensación de app instalada.
+- Cero recarga en navegación diaria.
+- Datos primero (persistencia + contratos), visual después.
+- Cambios por etapas y commits pequeños para estabilidad.
