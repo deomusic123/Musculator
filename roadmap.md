@@ -845,3 +845,28 @@ Solo web:
 - R1: eb9e9c4 - refactor(shell): stage r1 home profile-only surface.
 - R2: 309622b - refactor(nav): stage r2 route-based mobile shell nav.
 - R3: 52481fe - refactor(routes): stage r3 cleanup dashboard legacy.
+
+## 31) Ajuste Post-Refactor Solicitado - Restauracion Dashboard Home Original (2026-04-29)
+
+- Estado: completada.
+- Motivo: se solicita volver al dashboard Home previo al refactor (TrainingWorkspace completo) manteniendo intacta la arquitectura nueva de Lab.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/app/(shell)/page.tsx.
+- Accion:
+    - restauracion exacta de Home pre-refactor con TrainingWorkspace + AppNav.
+    - se conserva sin cambios la arquitectura de Lab en /lab/* y las mejoras de rutas/compatibilidad aplicadas en R2/R3.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Smoke manual en runtime:
+    - / vuelve a mostrar el dashboard original completo (perfil, telemetria, bloques operativos).
+    - /lab/exercises se mantiene operativo con la interfaz actual.
+
+### Evidencia
+
+- Snapshot funcional validado para / con dashboard original restaurado.
+- Snapshot funcional validado para /lab/exercises sin regresiones.
+- Commit de cierre: pendiente de registrar tras commit.
