@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import {
   clientCreateResponseSchema,
   clientListResponseSchema,
@@ -19,6 +20,7 @@ import {
   trainingTemplates,
 } from "@musculator/domain";
 import { startTransition, useDeferredValue, useEffect, useState, useTransition, type ReactNode } from "react";
+import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
 import type { SetupCheck } from "@/lib/platform/setup";
 import { TrainingIntakeForm } from "./intake-form";
 import { MobileTabBar } from "./mobile-tab-bar";
@@ -568,6 +570,7 @@ interface TrainingWorkspaceProps {
 }
 
 export function TrainingWorkspace({ initialSession, integrations }: TrainingWorkspaceProps) {
+  const { openSheet } = useGlobalOverlay();
   const [session, setSession] = useState(initialSession);
   const [mode, setMode] = useState<"dashboard" | "live">("dashboard");
   const [dashboardSurface, setDashboardSurface] = useState<"profile" | "lab" | "nutrition" | "clients">("profile");
@@ -683,6 +686,155 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
       : dashboardSurface === "nutrition"
         ? "nutrition"
         : "profile";
+
+  const openReadinessSheet = () => {
+    openSheet({
+      title: "Readiness SNC",
+      description: "Lectura detallada del estado neural y de la agresividad sugerida para la sesión.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Score actual</p>
+            <p className="mt-3 text-4xl font-semibold text-white">{analysis.readiness.score}</p>
+            <p className="mt-2 text-sm text-white/58">{readinessPalette[analysis.readiness.status].label}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Penalidad central</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(analysis.readiness.centralPenalty)}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Penalidad local</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(analysis.readiness.localPenalty)}</p>
+            </div>
+          </div>
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7">
+            Si el score cae, el sistema prioriza bajar agresividad, reducir fallo y usar la sesión live como ejecución guiada, no como exploración.
+          </div>
+        </div>
+      ),
+    });
+  };
+
+  const openMetabolicSheet = () => {
+    openSheet({
+      title: "Estado metabolico",
+      description: "Desglose de la energía objetivo y del avance diario en recuperación nutricional.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Ingesta proyectada</p>
+            <p className="mt-3 text-4xl font-semibold text-white">{projectedIntakeKcal}</p>
+            <p className="mt-2 text-sm text-white/58">objetivo {targetIntakeKcal} kcal</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Carbos ratio</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{session.recoveryInputs.carbsTargetRatio.toFixed(2)}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Hidratacion ratio</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{session.recoveryInputs.hydrationTargetRatio.toFixed(2)}</p>
+            </div>
+          </div>
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7">
+            Esta lectura mezcla tonelaje del draft, distribución de carbos y adherencia hídrica para estimar si hoy el bloque queda bien soportado.
+          </div>
+        </div>
+      ),
+    });
+  };
+
+  const openNextActionSheet = () => {
+    openSheet({
+      title: "Siguiente accion sugerida",
+      description: "Resumen operativo para decidir el próximo estímulo sin salir de la app.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7 text-white/82">
+            {nextActionSuggestion}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Bloque actual</p>
+              <p className="mt-3 text-xl font-semibold text-white">{session.title}</p>
+            </div>
+            <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Historial reciente</p>
+              <p className="mt-3 text-sm leading-7 text-white">{recentTitles.join(" · ") || "Sin historial todavía."}</p>
+            </div>
+          </div>
+        </div>
+      ),
+    });
+  };
+
+  const openAnatomySheet = () => {
+    openSheet({
+      title: "Mapa de calor anatómico",
+      description: "Vista rápida de los grupos con mayor carga acumulada y su ventana de recuperación.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          {recoveryCatalog.slice(0, 5).map((muscle) => (
+            <div key={muscle.muscle} className={`rounded-[1.3rem] border p-4 ${muscleTone[muscle.tone]}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{muscle.label}</p>
+                  <p className="text-sm opacity-75">{muscle.category}</p>
+                </div>
+                <span className="text-xs uppercase tracking-[0.18em]">{muscle.recoveryTimeHours}h</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
+
+  const openRadarSheet = () => {
+    openSheet({
+      title: "Radar biomecánico",
+      description: "Distribución del estímulo del último mes por ejes biomecánicos.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          {biomechanicalAxes.map((axis) => (
+            <div key={axis.key} className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-white">{axis.label}</p>
+                <span className="text-sm text-white/58">{axis.value}%</span>
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-black/30">
+                <div className="h-2 rounded-full bg-[#4cb894]" style={{ width: `${Math.max(axis.value, 4)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
+
+  const openConsistencySheet = () => {
+    openSheet({
+      title: "Mapa de calor de consistencia",
+      description: "Actividad reciente para leer adherencia y continuidad del atleta.",
+      content: (
+        <div className="grid gap-3 text-sm text-white/72">
+          <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Días activos últimos 7</p>
+            <p className="mt-3 text-4xl font-semibold text-white">{recentActiveDays}</p>
+          </div>
+          {heatmapDays.slice(-7).map((day) => (
+            <div key={day.dateKey} className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-white">{day.dateKey}</p>
+                <span className="text-sm text-white/58">{day.sessions.length} sesiones</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
 
   const filteredCatalog = trainingExerciseCatalog.filter((exercise) => {
     const matchesCategory = exercise.category === activeCategory;
@@ -1320,6 +1472,15 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
           </section>
 
           <div className="flex-1 overflow-y-auto px-3 pb-28 pt-3 sm:px-0 sm:pb-0 sm:pt-6">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={dashboardSurface}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="grid gap-6"
+            >
 
           {dashboardSurface === "profile" ? (
             <>
@@ -1400,7 +1561,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
 
               <section className="rounded-[2.35rem] border border-white/8 bg-[#08111a] p-3 shadow-[0_24px_80px_rgba(2,6,23,0.3)] md:p-4">
                 <div className="grid gap-3 lg:grid-cols-[0.9fr_1.05fr_0.92fr]">
-                  <article className={`rounded-[1.9rem] border p-5 ${analysis.readiness.status === "red" ? "border-rose-400/35 bg-[linear-gradient(180deg,rgba(127,29,29,0.9),rgba(76,5,25,0.92))]" : "border-white/8 bg-[#0d1724]"}`}>
+                  <article onClick={openReadinessSheet} className={`cursor-pointer rounded-[1.9rem] border p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30 ${analysis.readiness.status === "red" ? "border-rose-400/35 bg-[linear-gradient(180deg,rgba(127,29,29,0.9),rgba(76,5,25,0.92))]" : "border-white/8 bg-[#0d1724]"}`}>
                     <p className="text-sm uppercase tracking-[0.24em] text-white/45">Readiness SNC</p>
                     <div className="mt-4 flex justify-center">
                       <div
@@ -1433,7 +1594,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                     ) : null}
                   </article>
 
-                  <article className="rounded-[1.9rem] border border-white/8 bg-[#0d1724] p-5">
+                  <article onClick={openMetabolicSheet} className="cursor-pointer rounded-[1.9rem] border border-white/8 bg-[#0d1724] p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
                     <p className="text-sm uppercase tracking-[0.24em] text-white/45">Estado metabolico</p>
                     <div className="mt-5 flex items-end justify-between gap-3 text-white">
                       <p className="text-4xl font-semibold leading-none md:text-5xl">{projectedIntakeKcal}</p>
@@ -1461,7 +1622,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                     </div>
                   </article>
 
-                  <article className="rounded-[1.9rem] border border-white/8 bg-[#09111b] p-5">
+                  <article onClick={openNextActionSheet} className="cursor-pointer rounded-[1.9rem] border border-white/8 bg-[#09111b] p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
                     <p className="text-sm uppercase tracking-[0.24em] text-white/45">Siguiente accion sugerida</p>
                     <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                       <p className="text-base leading-8 text-white/82 md:text-lg md:leading-9">{nextActionSuggestion}</p>
@@ -1482,7 +1643,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
 
               <section className="grid gap-6 xl:grid-cols-[1.04fr_0.96fr]">
                 <div className="grid gap-6">
-                  <article className="rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)]">
+                  <article onClick={openAnatomySheet} className="cursor-pointer rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)] transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
                     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                       <div>
                         <p className="text-sm uppercase tracking-[0.24em] text-white/45">Mapa de calor anatómico</p>
@@ -1504,7 +1665,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                     </div>
                   </article>
 
-                  <article className="rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)]">
+                  <article onClick={openRadarSheet} className="cursor-pointer rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)] transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
                     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                       <div>
                         <p className="text-sm uppercase tracking-[0.24em] text-white/45">Radar biomecánico</p>
@@ -1520,7 +1681,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                     </div>
                   </article>
 
-                  <article className="rounded-[2.35rem] border border-white/8 bg-[#09111b] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
+                  <article onClick={openConsistencySheet} className="cursor-pointer rounded-[2.35rem] border border-white/8 bg-[#09111b] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)] transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
                     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                       <div>
                         <p className="text-sm uppercase tracking-[0.24em] text-white/45">Mapa de calor de consistencia</p>
@@ -2294,6 +2455,8 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
             </>
           )}
 
+            </motion.div>
+          </AnimatePresence>
           </div>
 
           {dashboardSurface !== "clients" ? (

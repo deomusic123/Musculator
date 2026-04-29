@@ -71,7 +71,7 @@ export function GlobalOverlayProvider({ children }: { children: ReactNode }) {
           <Dialog.Content
             className={`fixed z-50 border border-white/10 bg-[#0b1320] text-white shadow-[0_30px_80px_rgba(0,0,0,0.35)] focus:outline-none ${
               overlay.variant === "sheet"
-                ? "inset-y-0 right-0 w-full max-w-md rounded-l-[2rem] p-6"
+                ? "inset-x-0 bottom-0 max-h-[90dvh] w-full overflow-y-auto rounded-t-[2rem] p-5 md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:h-full md:max-h-none md:max-w-md md:rounded-t-none md:rounded-l-[2rem] md:p-6"
                 : "left-1/2 top-1/2 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[2rem] p-6"
             }`}
           >
