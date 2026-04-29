@@ -1080,3 +1080,46 @@ Solo web:
     - "Catalogo interno sin cambio de ruta"
     - "101 ejercicios visibles".
 - Verificacion de no navbar duplicada en modo embebido: ausencia de labels "Rutinas" y "Protocolos" en la vista /.
+
+## 37) Estandarizacion Mobile App Shell + Scroll (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: resolver bloqueo de scroll y friccion de navegacion en vista movil de Perfil/Home para consolidar comportamiento app-like estable.
+
+### Diagnostico raiz
+
+- Home en / combinaba altura fija de viewport + contenedores con overflow, generando un scroll trap en moviles.
+- El flujo principal dependia de scroll anidado en lugar de scroll natural de documento.
+- La barra inferior fija no contemplaba safe-area de dispositivos modernos.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/app/(shell)/page.tsx.
+    - se elimina bloqueo de overflow general.
+    - se reemplaza altura fija por min-height mobile-safe (svh).
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se elimina scroll anidado de dashboard.
+    - el contenido vuelve a scroll natural de pagina y reserva espacio inferior para navbar fija.
+- Archivo actualizado: apps/web/src/components/training/mobile-tab-bar.tsx.
+    - posicion inferior adaptada con safe-area inset.
+- Archivo actualizado: apps/web/src/app/globals.css.
+    - estandar base de scroll vertical en body y bloqueo de overflow horizontal.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+
+### Gate funcional (runtime movil)
+
+- Scroll vertical confirmado en /:
+    - antes: y=0.
+    - despues de wheel/touch simulation: y=1600.
+    - scrollHeight 6195 > innerHeight 368.
+- Navegacion movil confirmada sin cambio de ruta:
+    - tab Lab activa heading "Lab" manteniendo URL http://localhost:3000/.
+    - tab Nutricion activa heading "Nutricion" manteniendo URL http://localhost:3000/.
+
+### Evidencia
+
+- Se restablece flujo app movil continuo en Perfil/Home con scroll utilizable.
+- Se mantiene arquitectura single-app por tabs internas (Perfil/Lab/Nutricion/Live) en la ruta raiz.

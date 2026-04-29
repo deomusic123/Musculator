@@ -14,7 +14,7 @@ const tabs = [
 
 export function MobileTabBar({ activeTab, onSelectTab, onOpenLive }: MobileTabBarProps) {
   return (
-    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.6rem] border border-white/10 bg-[#08111a]/96 p-2 text-white shadow-[0_20px_50px_rgba(2,6,23,0.42)] backdrop-blur md:hidden">
+    <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 rounded-[1.6rem] border border-white/10 bg-[#08111a]/96 p-2 text-white shadow-[0_20px_50px_rgba(2,6,23,0.42)] backdrop-blur md:hidden">
       <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-2">
         {tabs.map((tab) => {
           const active = activeTab === tab.id;

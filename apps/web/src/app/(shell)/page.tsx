@@ -8,8 +8,8 @@ export default function DashboardHomePage() {
   const integrations = getSetupChecklist();
 
   return (
-    <main className="min-h-[100dvh] overflow-hidden px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-8">
-      <div className="mx-auto flex h-[100dvh] max-w-7xl gap-6 sm:h-auto">
+    <main className="min-h-[100svh] overflow-x-hidden px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-8">
+      <div className="mx-auto flex min-h-[100svh] max-w-7xl gap-6">
         <AppNav />
 
         <div className="min-w-0 flex-1 sm:min-h-0">
