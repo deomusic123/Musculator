@@ -1,0 +1,22 @@
+{
+  "name": "musculator",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @musculator/web",
+    "build": "npm run build --workspace @musculator/web",
+    "lint": "npm run lint --workspace @musculator/web",
+    "typecheck": "npm run typecheck --workspace @musculator/contracts && npm run typecheck --workspace @musculator/domain && npm run typecheck --workspace @musculator/web"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
