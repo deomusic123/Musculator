@@ -21,6 +21,7 @@ import {
 import { startTransition, useDeferredValue, useEffect, useState, useTransition, type ReactNode } from "react";
 import type { SetupCheck } from "@/lib/platform/setup";
 import { TrainingIntakeForm } from "./intake-form";
+import { MobileTabBar } from "./mobile-tab-bar";
 
 const readinessTone = {
   green: "border-emerald-400/30 bg-emerald-500/15 text-emerald-200",
@@ -569,7 +570,7 @@ interface TrainingWorkspaceProps {
 export function TrainingWorkspace({ initialSession, integrations }: TrainingWorkspaceProps) {
   const [session, setSession] = useState(initialSession);
   const [mode, setMode] = useState<"dashboard" | "live">("dashboard");
-  const [dashboardSurface, setDashboardSurface] = useState<"profile" | "workspace" | "clients">("profile");
+  const [dashboardSurface, setDashboardSurface] = useState<"profile" | "lab" | "nutrition" | "clients">("profile");
   const [clients, setClients] = useState<ClientProfile[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clientForm, setClientForm] = useState({
@@ -676,6 +677,12 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   const athleteTitle = selectedClient?.fullName
     ? `PERFIL DEL ATLETA · ${selectedClient.fullName.toUpperCase()}`
     : "PERFIL DEL ATLETA · MODO PREVIEW";
+  const mobileActiveTab =
+    dashboardSurface === "lab"
+      ? "lab"
+      : dashboardSurface === "nutrition"
+        ? "nutrition"
+        : "profile";
 
   const filteredCatalog = trainingExerciseCatalog.filter((exercise) => {
     const matchesCategory = exercise.category === activeCategory;
@@ -1040,6 +1047,16 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
     setSessionStartedAt(Date.now());
     setClockNow(Date.now());
     setRestSeconds(0);
+
+    void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
+
+  const closeLiveMode = () => {
+    setMode("dashboard");
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.().catch(() => undefined);
+    }
   };
 
   const plannedExercises = session.entries.map((entry, entryIndex) => ({
@@ -1053,7 +1070,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
   }));
 
   return (
-    <div className="grid gap-6 text-white">
+    <div className="min-h-[100dvh] text-white sm:min-h-0">
       {showCheckIn ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 backdrop-blur sm:items-center">
           <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#0c1420] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
@@ -1217,8 +1234,8 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
       ) : null}
 
       {mode === "dashboard" ? (
-        <>
-          <section className="rounded-[2rem] border border-white/8 bg-[#08111a] p-3 shadow-[0_24px_80px_rgba(2,6,23,0.24)]">
+        <div className="flex min-h-[100dvh] flex-col sm:min-h-0">
+          <section className="hidden rounded-[2rem] border border-white/8 bg-[#08111a] p-3 shadow-[0_24px_80px_rgba(2,6,23,0.24)] md:block">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -1233,15 +1250,61 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               </button>
               <button
                 type="button"
-                onClick={() => setDashboardSurface("workspace")}
+                onClick={() => setDashboardSurface("lab")}
                 className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
-                  dashboardSurface === "workspace"
+                  dashboardSurface === "lab"
                     ? "bg-[#4cb894] text-slate-950"
                     : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
                 }`}
               >
-                Workspace y debug
+                Lab
               </button>
+              <button
+                type="button"
+                onClick={() => setDashboardSurface("nutrition")}
+                className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
+                  dashboardSurface === "nutrition"
+                    ? "bg-[#4cb894] text-slate-950"
+                    : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
+                }`}
+              >
+                Nutricion
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardSurface("clients")}
+                className={`inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition ${
+                  dashboardSurface === "clients"
+                    ? "bg-[#4cb894] text-slate-950"
+                    : "border border-white/10 bg-white/6 text-white hover:bg-white/10"
+                }`}
+              >
+                Clientes
+              </button>
+              <button
+                type="button"
+                onClick={openLiveMode}
+                className="ml-auto inline-flex min-h-11 items-center justify-center rounded-full bg-[#4cb894] px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-[#63c7a5]"
+              >
+                Live
+              </button>
+            </div>
+          </section>
+
+          <section className="border-b border-white/8 bg-[#08111a] px-4 py-4 md:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-white/42">Musculator app</p>
+                <h1 className="mt-1 text-xl font-semibold text-white">
+                  {dashboardSurface === "profile"
+                    ? "Perfil"
+                    : dashboardSurface === "lab"
+                      ? "Lab"
+                      : dashboardSurface === "nutrition"
+                        ? "Nutricion"
+                        : "Clientes"}
+                </h1>
+              </div>
               <button
                 type="button"
                 onClick={() => setDashboardSurface("clients")}
@@ -1255,6 +1318,8 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               </button>
             </div>
           </section>
+
+          <div className="flex-1 overflow-y-auto px-3 pb-28 pt-3 sm:px-0 sm:pb-0 sm:pt-6">
 
           {dashboardSurface === "profile" ? (
             <>
@@ -1649,6 +1714,83 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
                   </div>
                 </div>
               ) : null}
+            </>
+          ) : dashboardSurface === "nutrition" ? (
+            <>
+              <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+                <article className="relative overflow-hidden rounded-[2.4rem] border border-white/8 bg-[#09111b] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.35)] md:p-8">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(76,184,148,0.18),transparent_0_28%),radial-gradient(circle_at_82%_18%,rgba(56,189,248,0.14),transparent_0_28%),radial-gradient(circle_at_60%_100%,rgba(245,158,11,0.12),transparent_0_34%)]" />
+                  <div className="relative grid gap-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/55">
+                        Fuel system
+                      </span>
+                      <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.18em] text-emerald-200">
+                        {intakeProgress}% cubierto
+                      </span>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-[auto_1fr] md:items-end">
+                      <div className="rounded-[2rem] border border-white/10 bg-black/20 px-6 py-5">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-white/42">Ingesta proyectada</p>
+                        <p className="mt-3 text-5xl font-semibold text-white">{projectedIntakeKcal}</p>
+                        <p className="mt-2 text-sm text-white/55">objetivo {targetIntakeKcal} kcal</p>
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-semibold text-white md:text-4xl">Nutricion integrada al bloque</h2>
+                        <p className="mt-3 max-w-2xl text-base leading-7 text-white/62">
+                          Esta superficie concentra recuperacion, carga metabolica y registro rapido sin mezclarlo con el builder del entrenamiento.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="h-3 rounded-full bg-black/30">
+                      <div
+                        className="h-3 rounded-full bg-gradient-to-r from-[#4cb894] via-[#6fd8b6] to-[#9cf3d3]"
+                        style={{ width: `${Math.max(intakeProgress, 8)}%` }}
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Carbos ratio</p>
+                        <p className="mt-3 text-3xl font-semibold text-white">{session.recoveryInputs.carbsTargetRatio.toFixed(2)}</p>
+                      </div>
+                      <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Hidratacion ratio</p>
+                        <p className="mt-3 text-3xl font-semibold text-white">{session.recoveryInputs.hydrationTargetRatio.toFixed(2)}</p>
+                      </div>
+                      <div className="rounded-[1.4rem] border border-white/10 bg-white/6 p-4">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Readiness</p>
+                        <p className="mt-3 text-3xl font-semibold text-white">{readinessScoreDisplay}</p>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="rounded-[2.4rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)] md:p-8">
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/45">Prioridades de recuperacion</p>
+                  <div className="mt-5 grid gap-3 text-sm leading-7 text-white/72">
+                    {analysis.recommendations.map((recommendation) => (
+                      <div key={recommendation} className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-3">
+                        {recommendation}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {recoveryCatalog.slice(0, 4).map((muscle) => (
+                      <div key={muscle.muscle} className={`rounded-[1.35rem] border p-4 ${muscleTone[muscle.tone]}`}>
+                        <p className="font-semibold">{muscle.label}</p>
+                        <p className="mt-1 text-sm opacity-75">{muscle.category}</p>
+                        <p className="mt-4 text-sm">Recovery {muscle.recoveryTimeHours}h</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </section>
+
+              <TrainingIntakeForm defaultPayload={intakePayload} persistenceEnabled={persistenceEnabled} />
             </>
           ) : dashboardSurface === "clients" ? (
             <>
@@ -2149,10 +2291,19 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
             </article>
           </section>
 
-          <TrainingIntakeForm defaultPayload={intakePayload} persistenceEnabled={persistenceEnabled} />
             </>
           )}
-        </>
+
+          </div>
+
+          {dashboardSurface !== "clients" ? (
+            <MobileTabBar
+              activeTab={mobileActiveTab}
+              onSelectTab={setDashboardSurface}
+              onOpenLive={openLiveMode}
+            />
+          ) : null}
+        </div>
       ) : (
         <section className="grid gap-6 rounded-[2.2rem] border border-white/8 bg-[#050b13] p-4 shadow-[0_24px_80px_rgba(2,6,23,0.4)] md:p-6">
           <div className="sticky top-3 z-10 rounded-[1.7rem] border border-white/10 bg-[#0b1420]/95 p-4 backdrop-blur">
@@ -2213,7 +2364,7 @@ export function TrainingWorkspace({ initialSession, integrations }: TrainingWork
               </button>
               <button
                 type="button"
-                onClick={() => setMode("dashboard")}
+                onClick={closeLiveMode}
                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/10 bg-white/6 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/10"
               >
                 Volver al dashboard
