@@ -906,4 +906,4 @@ Solo web:
 - Validacion de URL tras click en tab Lab desde Home: http://localhost:3000/lab/exercises.
 - Snapshot runtime en / con Perfil intacto.
 - Snapshot runtime en /lab/exercises tras navegacion desde Home.
-- Commit de cierre: pendiente de registrar tras commit.
+- Commit de cierre: 52320f4 (feat(home-lab): route lab tab to new exercises surface).
