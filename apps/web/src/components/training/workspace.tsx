@@ -24,7 +24,6 @@ import { EmbeddedExerciseCatalog } from "@/components/lab/embedded-exercise-cata
 import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
 import type { SetupCheck } from "@/lib/platform/setup";
 import { TrainingIntakeForm } from "./intake-form";
-import { MobileTabBar } from "./mobile-tab-bar";
 
 const readinessTone = {
   green: "border-emerald-400/30 bg-emerald-500/15 text-emerald-200",
@@ -2507,11 +2506,6 @@ export function TrainingWorkspace({
           </AnimatePresence>
           </div>
 
-          {dashboardSurface !== "clients" ? (
-            <MobileTabBar
-              onOpenLive={openLiveMode}
-            />
-          ) : null}
         </div>
       ) : (
         <section className="grid gap-6 rounded-[2.2rem] border border-white/8 bg-[#050b13] p-4 shadow-[0_24px_80px_rgba(2,6,23,0.4)] md:p-6">

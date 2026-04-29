@@ -34,7 +34,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-72 shrink-0 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_20px_60px_rgba(20,33,43,0.06)] xl:block">
+    <aside data-global-sidebar="true" className="hidden w-72 shrink-0 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_20px_60px_rgba(20,33,43,0.06)] xl:block">
       <div className="flex items-center gap-3 rounded-[1.5rem] bg-slate-950 px-4 py-4 text-white">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold">
           MU

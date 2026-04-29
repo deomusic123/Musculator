@@ -1435,3 +1435,49 @@ Solo web:
 - Lab mantiene catalogo completo y tabs administrativas operativas.
 - En mobile, Home y Lab comparten el mismo lenguaje de navbar inferior y estado activo coherente.
 - Navegacion comprobada entre / y /lab/exercises sin perdida de estado funcional en cada dominio.
+
+## 45) Auditoria Soft Navigation - Shell persistente sin parpadeo (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: eliminar la sensacion de hard-navigation/flicker entre Home y Lab garantizando chrome global persistente en root layout y navegacion client-side pura.
+
+### Cambios aplicados
+
+- Shell global persistente en root App Router:
+    - archivo actualizado: apps/web/src/app/layout.tsx.
+    - AppNav y MobileRouteNav pasan a montarse una sola vez en el layout raiz.
+    - se retira RouteTransition del root para evitar remount visual por cambio de pathname.
+- Home main deja de montar sidebar local:
+    - archivo actualizado: apps/web/src/app/(main)/page.tsx.
+    - la pagina retorna solo TrainingWorkspace; el chrome queda centralizado en root.
+- Lab shell deja de montar nav duplicada:
+    - archivo actualizado: apps/web/src/components/navigation/app-shell.tsx.
+    - se elimina montaje interno de AppNav/MobileRouteNav.
+- Workspace deja de montar TabBar mobile local:
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se elimina MobileTabBar para no duplicar barra inferior ni remount por superficie.
+- Limpieza de componente de transicion obsoleto:
+    - archivo eliminado: apps/web/src/components/navigation/route-transition.tsx.
+- Marcadores de auditoria DOM persistente:
+    - archivo actualizado: apps/web/src/components/navigation/app-nav.tsx (data-global-sidebar).
+    - archivo actualizado: apps/web/src/components/navigation/mobile-route-nav.tsx (data-global-mobile-nav).
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Gate funcional (auditoria runtime)
+
+- Verificacion en runtime sobre http://localhost:3002 con navegacion /lab -> / -> /lab usando links route-based.
+- Persistencia de shell confirmada por DOM identity check:
+    - data-global-mobile-nav conserva el mismo nodo entre cambios de ruta.
+    - data-global-sidebar conserva el mismo nodo entre cambios de ruta.
+    - conteo estable durante navegacion: 1 mobile nav y 1 sidebar (sin duplicados).
+- Soft navigation confirmada:
+    - token en window permanece vivo al cambiar de ruta con Link (sin reload completo).
+
+### Evidencia funcional
+
+- Jerarquia final: root layout controla shell y navegacion global; dominios inyectan solo contenido.
+- Navegacion entre / y /lab mantiene continuidad visual sin remount del menu.
+- Menus de navegacion principal y tabs de dominio mantienen comportamiento route-based con Link.
