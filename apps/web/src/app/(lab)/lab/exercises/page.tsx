@@ -1,13 +1,24 @@
 import { ExerciseCatalog } from "@/components/lab/exercise-catalog";
+import { parseLabExerciseFiltersFromRecord } from "@/lib/lab/exercise-filters";
 import { listLabExercises } from "@/lib/lab/persistence";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function LabExercisesPage() {
-  const initialData = await listLabExercises();
+interface LabExercisesPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function LabExercisesPage({ searchParams }: LabExercisesPageProps) {
+  const rawSearchParams = searchParams ? await searchParams : undefined;
+  const filters = parseLabExerciseFiltersFromRecord(rawSearchParams);
+  const initialData = await listLabExercises(filters);
 
   return (
-    <ExerciseCatalog initialData={initialData} />
+    <ExerciseCatalog
+      initialData={initialData}
+      initialFilters={filters}
+      syncWithUrl
+    />
   );
 }

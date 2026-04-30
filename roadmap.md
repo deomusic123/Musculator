@@ -1481,3 +1481,52 @@ Solo web:
 - Jerarquia final: root layout controla shell y navegacion global; dominios inyectan solo contenido.
 - Navegacion entre / y /lab mantiene continuidad visual sin remount del menu.
 - Menus de navegacion principal y tabs de dominio mantienen comportamiento route-based con Link.
+
+## 46) Ejecucion Etapa M3 - URL as State en Lab (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: mover filtros de /lab/exercises a query params, resolver dataset inicial en server y sincronizar UI cliente con URL para carga/reload/back-forward consistentes.
+
+### Cambios aplicados
+
+- Contrato de filtros compartido (server + client):
+    - archivo nuevo: apps/web/src/lib/lab/exercise-filters.ts.
+    - incluye parseo/normalizacion de q, pattern, vector, equipment, cns.
+    - incluye serializacion a query string y aplicacion de filtros tipada.
+- Server page de Lab alineada a searchParams:
+    - archivo actualizado: apps/web/src/app/(lab)/lab/exercises/page.tsx.
+    - la page ahora lee searchParams en servidor, construye filtros y llama listLabExercises(filters).
+    - se pasa initialFilters al catalogo para hidratar controles desde URL.
+- API de catalogo alineada a query params:
+    - archivo actualizado: apps/web/src/app/api/lab/exercises/route.ts.
+    - GET ahora parsea request.url y aplica filtros server-side.
+- Persistencia de Lab con filtro server-side opcional:
+    - archivo actualizado: apps/web/src/lib/lab/persistence.ts.
+    - listLabExercises acepta filtros y aplica contractualmente sobre connected/fallback/preview.
+- UI cliente sincronizada con URL:
+    - archivo actualizado: apps/web/src/components/lab/exercise-catalog.tsx.
+    - agrega props initialFilters y syncWithUrl.
+    - sincroniza estado de filtros con search params y reemplaza URL en navegacion cliente.
+    - agrega filtro CNS en barra (Todos, 1-3, 4-6, 7-10).
+
+### Gate tecnico M3
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Gate funcional M3 (runtime)
+
+- Caso de carga/reload directo:
+    - URL validada: /lab/exercises?q=press&vector=fuerza.
+    - resultado: textbox q=press, vector=FUERZA, y listado filtrado coherente al cargar y al recargar.
+- Sincronizacion UI -> URL:
+    - al cambiar Vector de FUERZA a Todos, URL actualiza a /lab/exercises?q=press.
+    - cantidad visible se recalcula en la vista resultante.
+- Back/forward conservando estado:
+    - flujo validado: /lab/exercises?q=press&vector=fuerza -> /lab/templates -> back.
+    - resultado: retorno a /lab/exercises?q=press&vector=fuerza con filtros y listado preservados.
+
+### Evidencia funcional
+
+- M3 operativo para deep-linking de filtros en /lab/exercises.
+- Reload de pagina y navegacion historica restauran el estado de filtros por URL.
+- Contrato de filtros unificado entre page, API, persistencia y componente cliente.

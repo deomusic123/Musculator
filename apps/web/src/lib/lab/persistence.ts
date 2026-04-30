@@ -1,5 +1,6 @@
 import type { TrainingExerciseCatalogItem } from "@musculator/contracts";
 import { trainingExerciseCatalog } from "@musculator/domain";
+import { applyLabExerciseFilters, defaultLabExerciseFilters, type LabExerciseFilters } from "@/lib/lab/exercise-filters";
 import type { Database, Json } from "@/lib/platform/supabase-types";
 import { createAdminSupabaseClient, getTrainingPersistenceContext } from "../platform/supabase-admin";
 
@@ -312,11 +313,16 @@ async function listCatalogFromExercisesTables(
     .sort((left, right) => right.cnsTaxMultiplier - left.cnsTaxMultiplier || left.name.localeCompare(right.name));
 }
 
-export async function listLabExercises(): Promise<LabExerciseListResponse> {
+export async function listLabExercises(filters: LabExerciseFilters = defaultLabExerciseFilters): Promise<LabExerciseListResponse> {
   const context = await getTrainingPersistenceContext();
 
   if (!context.configured) {
-    return buildPreviewResponse();
+    const preview = buildPreviewResponse();
+
+    return {
+      ...preview,
+      exercises: applyLabExerciseFilters(preview.exercises, filters),
+    };
   }
 
   const admin = createAdminSupabaseClient();
@@ -352,10 +358,15 @@ export async function listLabExercises(): Promise<LabExerciseListResponse> {
         return {
           status: "connected",
           storage: context.storage,
-          exercises: fallbackExercises,
+          exercises: applyLabExerciseFilters(fallbackExercises, filters),
         };
       } catch {
-        return buildPreviewResponse();
+        const preview = buildPreviewResponse();
+
+        return {
+          ...preview,
+          exercises: applyLabExerciseFilters(preview.exercises, filters),
+        };
       }
     }
 
@@ -369,6 +380,6 @@ export async function listLabExercises(): Promise<LabExerciseListResponse> {
   return {
     status: "connected",
     storage: context.storage,
-    exercises,
+    exercises: applyLabExerciseFilters(exercises, filters),
   };
 }

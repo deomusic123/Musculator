@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
+import { parseLabExerciseFiltersFromUrlSearchParams } from "@/lib/lab/exercise-filters";
 import { listLabExercises } from "@/lib/lab/persistence";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const response = await listLabExercises();
+    const filters = parseLabExerciseFiltersFromUrlSearchParams(new URL(request.url).searchParams);
+    const response = await listLabExercises(filters);
 
     return NextResponse.json(response);
   } catch (caughtError) {

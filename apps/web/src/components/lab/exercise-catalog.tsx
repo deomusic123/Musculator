@@ -18,7 +18,15 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  applyLabExerciseFilters,
+  buildLabExerciseFilterQueryString,
+  defaultLabExerciseFilters,
+  parseLabExerciseFiltersFromUrlSearchParams,
+  type LabExerciseFilters,
+} from "@/lib/lab/exercise-filters";
 import type { LabExerciseListItem, LabExerciseListResponse } from "@/lib/lab/persistence";
 
 const movementLabel: Record<LabExerciseListItem["movementPattern"], string> = {
@@ -136,10 +144,11 @@ interface ExerciseCatalogProps {
   initialData: LabExerciseListResponse;
   variant?: "standalone" | "embedded";
   className?: string;
+  initialFilters?: LabExerciseFilters;
+  syncWithUrl?: boolean;
 }
 
-type FilterKey = "pattern" | "vector" | "equipment";
-type EquipmentFilter = "all" | "barra" | "mancuerna" | "maquina" | "cable";
+type FilterKey = "pattern" | "vector" | "equipment" | "cns";
 
 interface ExerciseCardProps {
   exercise: LabExerciseListItem;
@@ -161,7 +170,7 @@ interface FilterDropdownProps {
   children: ReactNode;
 }
 
-function equipmentLabel(value: EquipmentFilter) {
+function equipmentLabel(value: LabExerciseFilters["equipment"]) {
   switch (value) {
     case "barra":
       return "Barra";
@@ -176,26 +185,20 @@ function equipmentLabel(value: EquipmentFilter) {
   }
 }
 
-function normalizeEquipment(equipment: string) {
-  const normalized = equipment.toLowerCase();
-
-  if (normalized.includes("barra")) {
-    return "barra";
+function cnsLabel(value: LabExerciseFilters["cns"]) {
+  if (value === "1-3") {
+    return "1-3";
   }
 
-  if (normalized.includes("mancuerna")) {
-    return "mancuerna";
+  if (value === "4-6") {
+    return "4-6";
   }
 
-  if (normalized.includes("maquina") || normalized.includes("machine")) {
-    return "maquina";
+  if (value === "7-10") {
+    return "7-10";
   }
 
-  if (normalized.includes("polea") || normalized.includes("cable")) {
-    return "cable";
-  }
-
-  return "all";
+  return "Todos";
 }
 
 function FilterDropdown({
@@ -393,15 +396,39 @@ function ExerciseSheet({ exercise, onClose }: ExerciseSheetProps) {
   );
 }
 
-export function ExerciseCatalog({ initialData, variant = "standalone", className }: ExerciseCatalogProps) {
-  const [query, setQuery] = useState("");
+export function ExerciseCatalog({
+  initialData,
+  variant = "standalone",
+  className,
+  initialFilters = defaultLabExerciseFilters,
+  syncWithUrl = false,
+}: ExerciseCatalogProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isRoutePending, startRouteTransition] = useTransition();
+
+  const syncUrlEnabled = variant === "standalone" && syncWithUrl;
+  const [query, setQuery] = useState(initialFilters.q);
   const [selectedExercise, setSelectedExercise] = useState<LabExerciseListItem | null>(null);
-  const [activePattern, setActivePattern] = useState<LabExerciseListItem["movementPattern"] | "all">("all");
-  const [activeVector, setActiveVector] = useState<LabExerciseListItem["stimulusVector"] | "all">("all");
-  const [activeEquipment, setActiveEquipment] = useState<EquipmentFilter>("all");
+  const [activePattern, setActivePattern] = useState<LabExerciseFilters["pattern"]>(initialFilters.pattern);
+  const [activeVector, setActiveVector] = useState<LabExerciseFilters["vector"]>(initialFilters.vector);
+  const [activeEquipment, setActiveEquipment] = useState<LabExerciseFilters["equipment"]>(initialFilters.equipment);
+  const [activeCns, setActiveCns] = useState<LabExerciseFilters["cns"]>(initialFilters.cns);
   const [openDropdown, setOpenDropdown] = useState<FilterKey | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
+
+  const activeFilters = useMemo<LabExerciseFilters>(
+    () => ({
+      q: query,
+      pattern: activePattern,
+      vector: activeVector,
+      equipment: activeEquipment,
+      cns: activeCns,
+    }),
+    [activeCns, activeEquipment, activePattern, activeVector, query],
+  );
 
   useEffect(() => {
     const onKeydown = (event: KeyboardEvent) => {
@@ -418,6 +445,42 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
       window.removeEventListener("keydown", onKeydown);
     };
   }, []);
+
+  useEffect(() => {
+    if (!syncUrlEnabled) {
+      return;
+    }
+
+    const filtersFromUrl = parseLabExerciseFiltersFromUrlSearchParams(searchParams);
+
+    setQuery((current) => (current === filtersFromUrl.q ? current : filtersFromUrl.q));
+    setActivePattern((current) => (current === filtersFromUrl.pattern ? current : filtersFromUrl.pattern));
+    setActiveVector((current) => (current === filtersFromUrl.vector ? current : filtersFromUrl.vector));
+    setActiveEquipment((current) => (current === filtersFromUrl.equipment ? current : filtersFromUrl.equipment));
+    setActiveCns((current) => (current === filtersFromUrl.cns ? current : filtersFromUrl.cns));
+  }, [searchParams, syncUrlEnabled]);
+
+  useEffect(() => {
+    if (!syncUrlEnabled) {
+      return;
+    }
+
+    const nextQuery = buildLabExerciseFilterQueryString({
+      ...activeFilters,
+      q: activeFilters.q.trim(),
+    });
+    const currentQuery = searchParams.toString();
+
+    if (nextQuery === currentQuery) {
+      return;
+    }
+
+    const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
+
+    startRouteTransition(() => {
+      router.replace(nextUrl, { scroll: false });
+    });
+  }, [activeFilters, pathname, router, searchParams, syncUrlEnabled]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -459,44 +522,12 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
   );
 
   const filteredExercises = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    if (syncUrlEnabled) {
+      return initialData.exercises;
+    }
 
-    return initialData.exercises.filter((exercise) => {
-      if (activePattern !== "all" && exercise.movementPattern !== activePattern) {
-        return false;
-      }
-
-      if (activeVector !== "all" && exercise.stimulusVector !== activeVector) {
-        return false;
-      }
-
-      if (activeEquipment !== "all" && normalizeEquipment(exercise.equipment) !== activeEquipment) {
-        return false;
-      }
-
-      if (!normalizedQuery) {
-        return true;
-      }
-
-      const searchable = [
-        exercise.name,
-        exercise.slug,
-        movementLabel[exercise.movementPattern],
-        exercise.equipment,
-        exercise.primaryMuscle.name,
-        exercise.primaryMuscle.slug,
-        ...exercise.primaryMuscles.map((muscle) => muscle.name),
-        ...exercise.primaryMuscles.map((muscle) => muscle.slug),
-        ...exercise.synergistMuscles.map((muscle) => muscle.name),
-        ...exercise.synergistMuscles.map((muscle) => muscle.slug),
-        movementSectionLabel[exercise.movementPattern],
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return searchable.includes(normalizedQuery);
-    });
-  }, [activeEquipment, activePattern, activeVector, initialData.exercises, query]);
+    return applyLabExerciseFilters(initialData.exercises, activeFilters);
+  }, [activeFilters, initialData.exercises, syncUrlEnabled]);
 
   const groupedExercises = useMemo(() => {
     const groups = new Map<LabExerciseListItem["movementPattern"], LabExerciseListItem[]>();
@@ -648,7 +679,7 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
             onToggle={() => setOpenDropdown((current) => (current === "equipment" ? null : "equipment"))}
             panelClassName={dropdownPanelClass}
           >
-            {(["all", "barra", "mancuerna", "maquina", "cable"] as EquipmentFilter[]).map((equipment) => (
+            {(["all", "barra", "mancuerna", "maquina", "cable"] as LabExerciseFilters["equipment"][]).map((equipment) => (
               <button
                 key={equipment}
                 type="button"
@@ -662,12 +693,37 @@ export function ExerciseCatalog({ initialData, variant = "standalone", className
               </button>
             ))}
           </FilterDropdown>
+
+          <FilterDropdown
+            title="CNS"
+            valueLabel={cnsLabel(activeCns)}
+            active={activeCns !== "all"}
+            opened={openDropdown === "cns"}
+            onToggle={() => setOpenDropdown((current) => (current === "cns" ? null : "cns"))}
+            panelClassName={dropdownPanelClass}
+          >
+            {(["all", "1-3", "4-6", "7-10"] as LabExerciseFilters["cns"][]).map((cns) => (
+              <button
+                key={cns}
+                type="button"
+                onClick={() => {
+                  setActiveCns(cns);
+                  setOpenDropdown(null);
+                }}
+                className={dropdownItemClass}
+              >
+                {cnsLabel(cns)}
+              </button>
+            ))}
+          </FilterDropdown>
         </div>
       </div>
 
       <div className={`flex items-center justify-between px-1 ${metaClass}`}>
         <span>{filteredExercises.length} ejercicios visibles</span>
-        <span className="uppercase tracking-[0.14em]">{initialData.storage}</span>
+        <span className="uppercase tracking-[0.14em]">
+          {syncUrlEnabled && isRoutePending ? "actualizando" : initialData.storage}
+        </span>
       </div>
 
       <motion.div layout className="space-y-5" initial={false}>
