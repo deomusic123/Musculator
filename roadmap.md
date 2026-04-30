@@ -1530,3 +1530,53 @@ Solo web:
 - M3 operativo para deep-linking de filtros en /lab/exercises.
 - Reload de pagina y navegacion historica restauran el estado de filtros por URL.
 - Contrato de filtros unificado entre page, API, persistencia y componente cliente.
+
+## 47) Ejecucion Etapa M4 - Live Store aislado (Zustand) (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: crear store minimo aislado para live session (tiempo, set activo y pausa), persistido en sessionStorage, y desacoplar el ingreso live del flujo principal del workspace.
+
+### Cambios aplicados
+
+- Dependencia de estado live agregada:
+    - archivo actualizado: apps/web/package.json.
+    - lockfile actualizado: package-lock.json.
+    - paquete agregado: zustand.
+- Store live aislado por dominio:
+    - archivo nuevo: apps/web/src/lib/live/live-session-store.ts.
+    - estado persistido en sessionStorage con middleware persist.
+    - estado minimo implementado:
+        - startedAtMs
+        - isPaused / pausedAtMs / pausedAccumulatedMs
+        - activeSetId
+        - sessionId
+- Superficie live cliente conectada al store:
+    - archivo nuevo: apps/web/src/components/live/live-session-shell.tsx.
+    - cronometro deriva del store (running/paused).
+    - selector de set activo conectado al store.
+    - controles de pausa/reanudar y reset live.
+- Page server de /session/[id] convertida en wrapper:
+    - archivo actualizado: apps/web/src/app/(live)/session/[id]/page.tsx.
+    - la page entrega sessionId al componente cliente live-session-shell.
+- Workspace desacoplado del embed live como flujo primario:
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - confirmLiveMode deja de activar modo local embebido y navega a /session/[id].
+
+### Gate tecnico M4
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Gate funcional M4 (runtime)
+
+- Persistencia al recargar en live validada en /session/m4-check:
+    - antes: timer 00:09, set activo SET 1, running.
+    - luego de pausar + cambiar set: timer 00:10, set activo SET 4, paused.
+    - tras reload: timer 00:10, set activo SET 4, paused (estado recuperado).
+- Aislamiento de store:
+    - store ubicado bajo lib/live y consumido solo por la superficie /session/[id].
+    - dominios main/lab no comparten este estado live.
+
+### Evidencia funcional
+
+- Continuidad de sesion live en refresh lograda con sessionStorage.
+- Estado minimo live (tiempo, pausa y set activo) ya no depende del estado local del dashboard para sostener ejecucion de la sesion.

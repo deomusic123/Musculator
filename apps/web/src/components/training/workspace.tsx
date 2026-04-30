@@ -19,6 +19,7 @@ import {
   trainingExerciseCatalog,
   trainingTemplates,
 } from "@musculator/domain";
+import { useRouter } from "next/navigation";
 import { startTransition, useDeferredValue, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { EmbeddedExerciseCatalog } from "@/components/lab/embedded-exercise-catalog";
 import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
@@ -586,6 +587,7 @@ export function TrainingWorkspace({
   bootstrap,
   initialSurface = "profile",
 }: TrainingWorkspaceProps) {
+  const router = useRouter();
   const { openSheet } = useGlobalOverlay();
   const [session, setSession] = useState(initialSession);
   const [mode, setMode] = useState<"dashboard" | "live">("dashboard");
@@ -1225,11 +1227,12 @@ export function TrainingWorkspace({
   };
 
   const confirmLiveMode = () => {
-    setMode("live");
     setShowCheckIn(false);
-    setSessionStartedAt(Date.now());
-    setClockNow(Date.now());
     setRestSeconds(0);
+
+    const liveSessionId = `${selectedClientId ?? "preview"}-${Date.now().toString(36)}`;
+
+    router.push(`/session/${encodeURIComponent(liveSessionId)}`);
 
     void document.documentElement.requestFullscreen?.().catch(() => undefined);
   };
