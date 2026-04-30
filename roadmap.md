@@ -1580,3 +1580,64 @@ Solo web:
 
 - Continuidad de sesion live en refresh lograda con sessionStorage.
 - Estado minimo live (tiempo, pausa y set activo) ya no depende del estado local del dashboard para sostener ejecucion de la sesion.
+
+## 48) Ejecucion Etapa M5 - App Shell inquebrantable + Live 100% inmersivo (2026-04-29)
+
+- Estado: completada.
+- Objetivo ejecutado: separar estrictamente el shell navegable de los dominios main/lab y dejar /session fuera del shell para ejecucion inmersiva sin chrome global.
+
+### Cambios aplicados
+
+- Root layout minimalista:
+    - archivo actualizado: apps/web/src/app/layout.tsx.
+    - alcance:
+        - conserva html/body, metadata, fuentes y proveedores globales.
+        - elimina montaje de AppNav y MobileRouteNav del root.
+- Route Group de shell navegable:
+    - archivos movidos:
+        - apps/web/src/app/(main) -> apps/web/src/app/(app-shell)/(main)
+        - apps/web/src/app/(lab) -> apps/web/src/app/(app-shell)/(lab)
+    - archivo nuevo: apps/web/src/app/(app-shell)/layout.tsx.
+    - alcance:
+        - inyecta AppNav (desktop) y MobileRouteNav (mobile).
+        - centraliza contenedor estructural (max-w-7xl, mx-auto, min-h svh).
+        - centraliza padding inferior de navegacion mobile para evitar duplicaciones.
+- Dominio live inmersivo separado del shell:
+    - archivo nuevo: apps/web/src/app/(live)/layout.tsx.
+    - alcance:
+        - solo renderiza contenido del dominio live.
+        - sin sidebar ni mobile nav.
+        - overflow-x-hidden para bloqueo horizontal en mobile.
+- Limpieza de paddings estructurales redundantes:
+    - archivo actualizado: apps/web/src/components/navigation/app-shell.tsx.
+        - se retira padding-bottom estructural duplicado.
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+        - se eliminan min-height/padding-bottom estructurales duplicados.
+        - el espaciado base queda delegado al layout de (app-shell).
+    - archivo actualizado: apps/web/src/components/live/live-session-shell.tsx.
+        - endurecido con min-h svh y overflow-x-hidden en superficie live.
+
+### Gate tecnico M5
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Gate funcional M5 (runtime)
+
+- Live 100% inmersivo en /session/m5-check:
+    - hasSidebar=false.
+    - hasMobileNav=false.
+- Navegacion sin saltos en shell compartido:
+    - desktop (/ -> /lab -> /): token en window persistente y mismo nodo de sidebar.
+    - mobile (/ -> /lab -> /): token en window persistente y mismo nodo de mobile nav.
+    - conteo estable en navegacion:
+        - sidebar: 1.
+        - mobile nav: 1.
+- Checklist viewports sin overflow horizontal (360/375/390/412):
+    - rutas auditadas: /, /lab/exercises?q=press&vector=fuerza, /session/m5-check.
+    - resultado: overflow=false en todas las combinaciones auditadas.
+
+### Evidencia funcional
+
+- El shell navegable queda acotado a dominios (main) y (lab) via (app-shell).
+- /session opera fuera del shell con experiencia inmersiva real y sin chrome global.
+- La navegacion entre Home y Lab mantiene continuidad de layout sin remount del chrome.

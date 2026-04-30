@@ -1256,7 +1256,7 @@ export function TrainingWorkspace({
   }));
 
   return (
-    <div className="min-h-[100svh] text-white">
+    <div className="min-w-0 text-white">
       {showCheckIn ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-4 backdrop-blur sm:items-center">
           <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#0c1420] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
@@ -1420,7 +1420,7 @@ export function TrainingWorkspace({
       ) : null}
 
       {mode === "dashboard" ? (
-        <div className="flex min-h-[100svh] flex-col">
+        <div className="flex min-h-0 flex-col">
           <section className="hidden rounded-[2rem] border border-white/8 bg-[#08111a] p-3 shadow-[0_24px_80px_rgba(2,6,23,0.24)] md:block">
             <div className="flex flex-wrap gap-2">
               <button
@@ -1505,7 +1505,7 @@ export function TrainingWorkspace({
             </div>
           </section>
 
-          <div className="flex-1 px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-0 sm:pb-0 sm:pt-6">
+          <div className="flex-1 px-3 pb-4 pt-3 sm:px-0 sm:pb-0 sm:pt-6">
           <AnimatePresence initial={false} mode="wait">
             <motion.div
               key={dashboardSurface}

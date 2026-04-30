@@ -9,7 +9,7 @@ interface AppShellProps {
 
 export function AppShell({ eyebrow, title, description, children }: AppShellProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-6 pb-[calc(7.5rem+env(safe-area-inset-bottom))] xl:pb-0">
+    <div className="flex min-w-0 flex-col gap-6">
       <section className="rounded-[2rem] border border-white/8 bg-[#08111a] p-6 text-white shadow-[0_24px_80px_rgba(2,6,23,0.24)]">
         <p className="text-sm uppercase tracking-[0.24em] text-white/48">{eyebrow}</p>
         <h1 className="mt-3 text-3xl font-semibold text-white md:text-5xl">{title}</h1>

@@ -62,8 +62,8 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
   const activeSetDisplay = activeSetId ?? "set-1";
 
   return (
-    <main className="min-h-screen bg-[#05080f] px-4 py-4 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-5xl flex-col justify-between rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(76,184,148,0.16),transparent_0_30%),#08111a] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.35)] md:p-8">
+    <main className="min-h-[100svh] overflow-x-hidden bg-[#05080f] px-3 py-3 text-white sm:px-4 sm:py-4">
+      <div className="mx-auto flex min-h-[calc(100svh-1.5rem)] max-w-5xl flex-col justify-between rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(76,184,148,0.16),transparent_0_30%),#08111a] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:min-h-[calc(100svh-2rem)] sm:p-6 md:p-8">
         <section className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-white/45">Instancia de combate</p>
