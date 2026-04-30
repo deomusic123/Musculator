@@ -1727,3 +1727,82 @@ Solo web:
 
 - Etapa 2 pasa de placeholder a constructor operativo con persistencia real.
 - El costo neural por template queda trazable y actualizado en vivo durante la edicion.
+
+## 51) Ejecucion Etapa 3 - Perfil Pro conectado a datos reales (2026-04-30)
+
+- Estado: completada.
+- Objetivo ejecutado: conectar analitica pro del perfil con datos persistidos por cliente (historial real + referencia de templates/protocolos) y exponer comparativas reales vs objetivo.
+
+### Cambios aplicados
+
+- Contratos tipados de analitica pro:
+    - archivo actualizado: packages/contracts/src/training.ts.
+    - nuevo contrato compartido:
+        - clientProfileAnalyticsResponseSchema
+        - clientProfileAnalyticsSchema
+        - biomechanicalRadarAxisSchema
+        - profileStimulusBalanceSliceSchema
+- Persistencia training con telemetria pro:
+    - archivo actualizado: apps/web/src/lib/training/persistence.ts.
+    - capacidades nuevas:
+        - getClientProfileAnalytics(clientId) con agregacion real desde SQL.
+        - calculo readiness desde costo neural semanal, gap dinamico de recuperacion y soporte nutricional.
+        - radar biomecanico actual vs objetivo (protocol/template) con ejes normalizados.
+        - balance por stimulus_vector actual vs target.
+        - fallback de plan de referencia cuando no hay asignacion activa de protocolo.
+    - mejora de guardado:
+        - saveTrainingSession ahora persiste metadatos de recuperacion (sleep/carbos/hidratacion) en notes para analitica nutricional posterior.
+- API Stage 3:
+    - archivo actualizado: apps/web/src/app/api/clients/route.ts.
+        - GET ahora soporta modo analytics con query params:
+          - /api/clients?analytics=1&clientId={uuid}
+    - archivo actualizado: apps/web/src/app/api/training/sessions/route.ts.
+        - GET ahora soporta limit parametrico (1..84) para ampliar ventana historica del perfil.
+- Bootstrap y UI de perfil conectados:
+    - archivo actualizado: apps/web/src/app/(app-shell)/(main)/page.tsx.
+        - bootstrap server-side incluye profileAnalytics inicial.
+        - historial inicial ampliado a 84 para heatmap/telemetria.
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+        - fetch y refresh de analitica por cliente.
+        - readiness del perfil alimentado por telemetria persistida.
+        - card nueva de Costo neural semanal (real vs objetivo).
+        - card de gap nutricional de recuperacion (support ratio vs target ratio).
+        - radar biomecanico dual (actual vs objetivo) con gap por eje.
+        - balance de vectores comparando actual sets vs target sets.
+
+### Gate tecnico Etapa 3
+
+- npm.cmd run typecheck --prefix c:\Users\devdi\Desktop\project\musculator en verde:
+    - @musculator/contracts
+    - @musculator/domain
+    - @musculator/web
+
+### Gate funcional Etapa 3 (runtime)
+
+- API de analitica pro por cliente:
+    - GET /api/clients?analytics=1&clientId=80aeb197-30e7-4787-81b2-fb09aa25bc28
+    - respuesta validada:
+        - status=connected
+        - storage=supabase
+        - readiness=0 (red)
+        - weeklyNeuralCost=144
+        - weeklyNeuralTarget=16.8
+        - nutritionRecoveryGap=0.35 (35%)
+        - radarAxes=5
+        - stimulusBalance slices=6
+- API historial con ventana extendida:
+    - GET /api/training/sessions?limit=84&clientId=80aeb197-30e7-4787-81b2-fb09aa25bc28
+    - respuesta validada: sessions=2, storage=supabase.
+- Smoke transversal Perfil/Lab/Live:
+    - / responde 200.
+    - /lab/templates responde 200.
+    - /session/stage3-smoke responde 200.
+
+### Evidencia funcional
+
+- Perfil renderiza bloques pro conectados a SQL real:
+    - card Costo neural semanal.
+    - card Gap nutricional.
+    - Radar biomecanico con objetivo y gap por eje.
+    - Plan de referencia visible (template/protocolo).
+- La analitica deja de depender solo de heuristicas locales del draft y queda trazada a datos persistidos por cliente.

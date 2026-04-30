@@ -6,7 +6,7 @@ import {
 } from "@/components/training/workspace";
 import { listClients } from "@/lib/client/persistence";
 import { getSetupChecklist } from "@/lib/platform/setup";
-import { listTrainingSessions } from "@/lib/training/persistence";
+import { getClientProfileAnalytics, listTrainingSessions } from "@/lib/training/persistence";
 
 interface DashboardHomePageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -26,7 +26,10 @@ async function loadMainBootstrap(): Promise<TrainingWorkspaceBootstrapData> {
   try {
     const clientResponse = await listClients();
     const selectedClientId = clientResponse.clients[0]?.id ?? null;
-    const historyResponse = await listTrainingSessions(8, selectedClientId ?? undefined);
+    const historyResponse = await listTrainingSessions(84, selectedClientId ?? undefined);
+    const analyticsResponse = selectedClientId
+      ? await getClientProfileAnalytics(selectedClientId)
+      : null;
 
     return {
       storageMode:
@@ -36,6 +39,7 @@ async function loadMainBootstrap(): Promise<TrainingWorkspaceBootstrapData> {
       clients: clientResponse.clients,
       selectedClientId,
       history: historyResponse.sessions,
+      profileAnalytics: analyticsResponse?.analytics ?? null,
     };
   } catch {
     return {
@@ -43,6 +47,7 @@ async function loadMainBootstrap(): Promise<TrainingWorkspaceBootstrapData> {
       clients: [],
       selectedClientId: null,
       history: [],
+      profileAnalytics: null,
     };
   }
 }

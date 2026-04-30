@@ -4,8 +4,13 @@ import { listTrainingSessions, saveTrainingSession } from "@/lib/training/persis
 
 export async function GET(request: Request) {
   try {
-    const clientId = new URL(request.url).searchParams.get("clientId") ?? undefined;
-    const history = await listTrainingSessions(8, clientId);
+    const url = new URL(request.url);
+    const clientId = url.searchParams.get("clientId") ?? undefined;
+    const requestedLimit = Number(url.searchParams.get("limit") ?? "8");
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(Math.round(requestedLimit), 1), 84)
+      : 8;
+    const history = await listTrainingSessions(limit, clientId);
 
     return NextResponse.json(history);
   } catch (caughtError) {

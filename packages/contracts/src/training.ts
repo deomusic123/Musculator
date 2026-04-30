@@ -304,6 +304,49 @@ export const trainingHistoryResponseSchema = z.object({
   sessions: z.array(persistedTrainingSessionSummarySchema),
 });
 
+export const biomechanicalRadarAxisSchema = z.object({
+  key: z.enum([
+    "verticalPull",
+    "horizontalPull",
+    "push",
+    "posteriorChain",
+    "conditioning",
+  ]),
+  label: z.string().min(2),
+  actualPercent: z.number().min(0).max(100),
+  targetPercent: z.number().min(0).max(100),
+  gapPercent: z.number().min(-100).max(100),
+});
+
+export const profileStimulusBalanceSliceSchema = z.object({
+  stimulusVector: stimulusVectorSchema,
+  actualSets: z.number().int().min(0),
+  targetSets: z.number().min(0),
+  actualLoadKg: z.number().min(0),
+});
+
+export const clientProfileAnalyticsSchema = z.object({
+  clientId: z.string().uuid(),
+  readiness: readinessBreakdownSchema,
+  weeklyNeuralCost: z.number().min(0),
+  weeklyNeuralTarget: z.number().min(0),
+  weeklyNeuralDelta: z.number(),
+  recoveryGapHours: z.number().min(0),
+  nutritionRecoveryGap: z.number().min(0),
+  nutritionSupportRatio: z.number().min(0),
+  targetSupportRatio: z.number().min(0),
+  radarAxes: z.array(biomechanicalRadarAxisSchema).length(5),
+  stimulusBalance: z.array(profileStimulusBalanceSliceSchema).min(1),
+  referenceTemplateName: z.string().min(1).optional(),
+  referenceProtocolName: z.string().min(1).optional(),
+});
+
+export const clientProfileAnalyticsResponseSchema = z.object({
+  status: z.enum(["connected", "preview"]),
+  storage: z.enum(["supabase", "noop"]),
+  analytics: clientProfileAnalyticsSchema,
+});
+
 export const trainingIngestionRequestSchema = z.object({
   source: workoutSourceSchema,
   rawInput: z.string().min(1).max(5000),
@@ -360,5 +403,9 @@ export type PersistedTrainingSessionSummary = z.infer<
 >;
 export type TrainingSessionSaveResponse = z.infer<typeof trainingSessionSaveResponseSchema>;
 export type TrainingHistoryResponse = z.infer<typeof trainingHistoryResponseSchema>;
+export type BiomechanicalRadarAxis = z.infer<typeof biomechanicalRadarAxisSchema>;
+export type ProfileStimulusBalanceSlice = z.infer<typeof profileStimulusBalanceSliceSchema>;
+export type ClientProfileAnalytics = z.infer<typeof clientProfileAnalyticsSchema>;
+export type ClientProfileAnalyticsResponse = z.infer<typeof clientProfileAnalyticsResponseSchema>;
 export type TrainingIngestionRequest = z.infer<typeof trainingIngestionRequestSchema>;
 export type TrainingIngestionResponse = z.infer<typeof trainingIngestionResponseSchema>;

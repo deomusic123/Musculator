@@ -2,10 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  clientProfileAnalyticsResponseSchema,
   clientCreateResponseSchema,
   clientListResponseSchema,
   trainingHistoryResponseSchema,
   trainingSessionSaveResponseSchema,
+  type BiomechanicalRadarAxis,
+  type ClientProfileAnalytics,
   type ClientProfile,
   type PersistedTrainingSessionSummary,
   type TrainingSessionDraft,
@@ -185,7 +188,7 @@ function buildConsistencyHeatmap(history: PersistedTrainingSessionSummary[]) {
   });
 }
 
-function inferBiomechanicalAxes(history: PersistedTrainingSessionSummary[]) {
+function inferBiomechanicalAxes(history: PersistedTrainingSessionSummary[]): BiomechanicalRadarAxis[] {
   const limitDate = new Date();
   limitDate.setDate(limitDate.getDate() - 30);
 
@@ -235,11 +238,41 @@ function inferBiomechanicalAxes(history: PersistedTrainingSessionSummary[]) {
   const maxValue = Math.max(...Object.values(totals), 1);
 
   return [
-    { key: "verticalPull", label: "Traccion vertical", value: Math.round((totals.verticalPull / maxValue) * 100) },
-    { key: "horizontalPull", label: "Traccion horizontal", value: Math.round((totals.horizontalPull / maxValue) * 100) },
-    { key: "push", label: "Empuje", value: Math.round((totals.push / maxValue) * 100) },
-    { key: "posteriorChain", label: "Cadena posterior", value: Math.round((totals.posteriorChain / maxValue) * 100) },
-    { key: "conditioning", label: "Acondicionamiento", value: Math.round((totals.conditioning / maxValue) * 100) },
+    {
+      key: "verticalPull",
+      label: "Traccion vertical",
+      actualPercent: Math.round((totals.verticalPull / maxValue) * 100),
+      targetPercent: Math.round((totals.verticalPull / maxValue) * 100),
+      gapPercent: 0,
+    },
+    {
+      key: "horizontalPull",
+      label: "Traccion horizontal",
+      actualPercent: Math.round((totals.horizontalPull / maxValue) * 100),
+      targetPercent: Math.round((totals.horizontalPull / maxValue) * 100),
+      gapPercent: 0,
+    },
+    {
+      key: "push",
+      label: "Empuje",
+      actualPercent: Math.round((totals.push / maxValue) * 100),
+      targetPercent: Math.round((totals.push / maxValue) * 100),
+      gapPercent: 0,
+    },
+    {
+      key: "posteriorChain",
+      label: "Cadena posterior",
+      actualPercent: Math.round((totals.posteriorChain / maxValue) * 100),
+      targetPercent: Math.round((totals.posteriorChain / maxValue) * 100),
+      gapPercent: 0,
+    },
+    {
+      key: "conditioning",
+      label: "Acondicionamiento",
+      actualPercent: Math.round((totals.conditioning / maxValue) * 100),
+      targetPercent: Math.round((totals.conditioning / maxValue) * 100),
+      gapPercent: 0,
+    },
   ];
 }
 
@@ -280,7 +313,7 @@ function getRadarGridPolygon(steps: number, step: number, radius: number, center
 function BiomechanicalRadar({
   axes,
 }: {
-  axes: Array<{ key: string; label: string; value: number }>;
+  axes: BiomechanicalRadarAxis[];
 }) {
   const center = 120;
   const radius = 78;
@@ -315,15 +348,22 @@ function BiomechanicalRadar({
           );
         })}
         <polygon
-          points={getRadarPolygon(axes.map((axis) => axis.value), radius, center)}
+          points={getRadarPolygon(axes.map((axis) => axis.targetPercent), radius, center)}
+          fill="rgba(56,189,248,0.12)"
+          stroke="rgba(125,211,252,0.8)"
+          strokeWidth="1.5"
+          strokeDasharray="4 4"
+        />
+        <polygon
+          points={getRadarPolygon(axes.map((axis) => axis.actualPercent), radius, center)}
           fill="rgba(76,184,148,0.24)"
           stroke="#4cb894"
           strokeWidth="2"
         />
         {axes.map((axis, index) => {
           const angle = -Math.PI / 2 + (index * Math.PI * 2) / axes.length;
-          const x = center + Math.cos(angle) * ((radius * axis.value) / 100);
-          const y = center + Math.sin(angle) * ((radius * axis.value) / 100);
+          const x = center + Math.cos(angle) * ((radius * axis.actualPercent) / 100);
+          const y = center + Math.sin(angle) * ((radius * axis.actualPercent) / 100);
 
           return <circle key={`${axis.key}-dot`} cx={x} cy={y} r="4" fill="#9cf3d3" />;
         })}
@@ -334,14 +374,18 @@ function BiomechanicalRadar({
           <div key={axis.key} className="rounded-[1.25rem] border border-white/10 bg-white/6 p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-medium text-white">{axis.label}</p>
-              <span className="text-sm font-semibold text-[#9cf3d3]">{axis.value}%</span>
+              <span className="text-sm font-semibold text-[#9cf3d3]">{axis.actualPercent}%</span>
             </div>
             <div className="mt-3 h-2 rounded-full bg-black/30">
               <div
                 className="h-2 rounded-full bg-gradient-to-r from-[#4cb894] via-[#65c7a8] to-[#8df2ce]"
-                style={{ width: `${Math.max(axis.value, 8)}%` }}
+                style={{ width: `${Math.max(axis.actualPercent, 8)}%` }}
               />
             </div>
+            <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
+              objetivo {axis.targetPercent}% · gap {axis.gapPercent > 0 ? "+" : ""}
+              {axis.gapPercent}%
+            </p>
           </div>
         ))}
       </div>
@@ -577,6 +621,7 @@ export interface TrainingWorkspaceBootstrapData {
   clients: ClientProfile[];
   selectedClientId: string | null;
   history: PersistedTrainingSessionSummary[];
+  profileAnalytics: ClientProfileAnalytics | null;
 }
 
 export type DashboardSurface = "profile" | "lab" | "nutrition" | "clients";
@@ -614,12 +659,17 @@ export function TrainingWorkspace({
   const [isSaving, startSavingTransition] = useTransition();
   const [isCreatingClient, startClientTransition] = useTransition();
   const [isRefreshingHistory, startHistoryTransition] = useTransition();
+  const [isRefreshingAnalytics, startAnalyticsTransition] = useTransition();
   const [history, setHistory] = useState<PersistedTrainingSessionSummary[]>(bootstrap?.history ?? []);
+  const [profileAnalytics, setProfileAnalytics] = useState<ClientProfileAnalytics | null>(
+    bootstrap?.profileAnalytics ?? null,
+  );
   const [storageMode, setStorageMode] = useState<"supabase" | "noop">(bootstrap?.storageMode ?? "noop");
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedHeatmapDay, setSelectedHeatmapDay] = useState<string | null>(null);
   const skippedBootstrapHistory = useRef(false);
+  const skippedBootstrapAnalytics = useRef(false);
 
   const deferredSession = useDeferredValue(session);
   const analysis = analyzeTrainingSession(deferredSession);
@@ -635,10 +685,38 @@ export function TrainingWorkspace({
   const heatmapDays = buildConsistencyHeatmap(history);
   const activeHeatmapDay = heatmapDays.find((day) => day.dateKey === selectedHeatmapDay) ?? null;
   const recentActiveDays = heatmapDays.slice(-7).filter((day) => day.sessions.length > 0).length;
-  const biomechanicalAxes = inferBiomechanicalAxes(history);
+  const fallbackBiomechanicalAxes = inferBiomechanicalAxes(history);
+  const biomechanicalAxes = profileAnalytics?.radarAxes ?? fallbackBiomechanicalAxes;
   const weakestBiomechanicalAxis = [...biomechanicalAxes].sort(
-    (left, right) => left.value - right.value,
+    (left, right) => left.actualPercent - right.actualPercent,
   )[0];
+  const profileReadiness = profileAnalytics?.readiness ?? analysis.readiness;
+  const weeklyNeuralCost = profileAnalytics?.weeklyNeuralCost ?? Number((analysis.summary.totalSets * 7.4).toFixed(1));
+  const weeklyNeuralTarget = profileAnalytics?.weeklyNeuralTarget ?? weeklyNeuralCost;
+  const weeklyNeuralDelta = profileAnalytics?.weeklyNeuralDelta ?? 0;
+  const recoveryGapHours = profileAnalytics?.recoveryGapHours ?? 0;
+  const nutritionRecoveryGap = profileAnalytics?.nutritionRecoveryGap ?? 0;
+  const nutritionSupportRatio =
+    profileAnalytics?.nutritionSupportRatio ??
+    Number(((session.recoveryInputs.carbsTargetRatio + session.recoveryInputs.hydrationTargetRatio) / 2).toFixed(2));
+  const targetSupportRatio = profileAnalytics?.targetSupportRatio ?? 1;
+  const profileStimulusBalance =
+    profileAnalytics?.stimulusBalance.map((slice) => ({
+      stimulusVector: slice.stimulusVector,
+      totalSets: slice.actualSets,
+      totalLoadKg: slice.actualLoadKg,
+      targetSets: slice.targetSets,
+    })) ??
+    analysis.stimulusBalance.map((slice) => ({
+      stimulusVector: slice.stimulusVector,
+      totalSets: slice.totalSets,
+      totalLoadKg: slice.totalLoadKg,
+      targetSets: slice.totalSets,
+    }));
+  const referencePlanLabel =
+    profileAnalytics?.referenceProtocolName ??
+    profileAnalytics?.referenceTemplateName ??
+    "Sin plantilla/protocolo activo";
   const age = extractMetricFromNotes(selectedClient?.notes, /(\d{2})\s*(?:anos|a\b|años)/i, 27);
   const heightMeters = extractMetricFromNotes(selectedClient?.notes, /(1\.[4-9]\d?)\s*m/i, 1.75);
   const weightKg = extractMetricFromNotes(selectedClient?.notes, /(\d{2,3}(?:[\.,]\d)?)\s*kg/i, 78);
@@ -686,7 +764,7 @@ export function TrainingWorkspace({
   )
     .sort((left, right) => right[1].totalLoadKg - left[1].totalLoadKg)
     .slice(0, 4);
-  const readinessScoreDisplay = (analysis.readiness.score / 10).toFixed(1);
+  const readinessScoreDisplay = (profileReadiness.score / 10).toFixed(1);
   const weeklyWindowStart = new Date();
   weeklyWindowStart.setHours(0, 0, 0, 0);
   weeklyWindowStart.setDate(weeklyWindowStart.getDate() - 6);
@@ -713,21 +791,21 @@ export function TrainingWorkspace({
         <div className="grid gap-3 text-sm text-white/72">
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
             <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Score actual</p>
-            <p className="mt-3 text-4xl font-semibold text-white">{analysis.readiness.score}</p>
-            <p className="mt-2 text-sm text-white/58">{readinessPalette[analysis.readiness.status].label}</p>
+            <p className="mt-3 text-4xl font-semibold text-white">{profileReadiness.score}</p>
+            <p className="mt-2 text-sm text-white/58">{readinessPalette[profileReadiness.status].label}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Penalidad central</p>
-              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(analysis.readiness.centralPenalty)}</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(profileReadiness.centralPenalty)}</p>
             </div>
             <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
               <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Penalidad local</p>
-              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(analysis.readiness.localPenalty)}</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{formatRounded(profileReadiness.localPenalty)}</p>
             </div>
           </div>
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7">
-            Si el score cae, el sistema prioriza bajar agresividad, reducir fallo y usar la sesión live como ejecución guiada, no como exploración.
+            Se calcula con sobrecarga neural semanal, gap de recuperación dinámica y soporte nutricional capturado en sesiones reales del cliente.
           </div>
         </div>
       ),
@@ -737,26 +815,26 @@ export function TrainingWorkspace({
   const openMetabolicSheet = () => {
     openSheet({
       title: "Estado metabolico",
-      description: "Desglose de la energía objetivo y del avance diario en recuperación nutricional.",
+      description: "Costo neural semanal y soporte de recuperación nutricional contra el objetivo del bloque.",
       content: (
         <div className="grid gap-3 text-sm text-white/72">
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Ingesta proyectada</p>
-            <p className="mt-3 text-4xl font-semibold text-white">{projectedIntakeKcal}</p>
-            <p className="mt-2 text-sm text-white/58">objetivo {targetIntakeKcal} kcal</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Costo neural semanal</p>
+            <p className="mt-3 text-4xl font-semibold text-white">{weeklyNeuralCost}</p>
+            <p className="mt-2 text-sm text-white/58">objetivo {weeklyNeuralTarget} · delta {weeklyNeuralDelta > 0 ? "+" : ""}{weeklyNeuralDelta}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Carbos ratio</p>
-              <p className="mt-3 text-2xl font-semibold text-white">{session.recoveryInputs.carbsTargetRatio.toFixed(2)}</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Support ratio</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{nutritionSupportRatio.toFixed(2)}</p>
             </div>
             <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Hidratacion ratio</p>
-              <p className="mt-3 text-2xl font-semibold text-white">{session.recoveryInputs.hydrationTargetRatio.toFixed(2)}</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Gap nutricional</p>
+              <p className="mt-3 text-2xl font-semibold text-white">{Math.round(nutritionRecoveryGap * 100)}%</p>
             </div>
           </div>
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7">
-            Esta lectura mezcla tonelaje del draft, distribución de carbos y adherencia hídrica para estimar si hoy el bloque queda bien soportado.
+            Plan de referencia: {referencePlanLabel}. Ratio objetivo {targetSupportRatio.toFixed(2)} contra soporte real {nutritionSupportRatio.toFixed(2)}.
           </div>
         </div>
       ),
@@ -819,10 +897,10 @@ export function TrainingWorkspace({
             <div key={axis.key} className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium text-white">{axis.label}</p>
-                <span className="text-sm text-white/58">{axis.value}%</span>
+                <span className="text-sm text-white/58">{axis.actualPercent}% (objetivo {axis.targetPercent}%)</span>
               </div>
               <div className="mt-3 h-2 rounded-full bg-black/30">
-                <div className="h-2 rounded-full bg-[#4cb894]" style={{ width: `${Math.max(axis.value, 4)}%` }} />
+                <div className="h-2 rounded-full bg-[#4cb894]" style={{ width: `${Math.max(axis.actualPercent, 4)}%` }} />
               </div>
             </div>
           ))}
@@ -919,7 +997,7 @@ export function TrainingWorkspace({
           return;
         }
 
-        const response = await fetch(`/api/training/sessions?clientId=${selectedClientId}`, {
+        const response = await fetch(`/api/training/sessions?clientId=${selectedClientId}&limit=84`, {
           method: "GET",
           cache: "no-store",
         });
@@ -942,6 +1020,43 @@ export function TrainingWorkspace({
         setStorageMode("noop");
         setHistoryError(
           caughtError instanceof Error ? caughtError.message : "No se pudo leer el historial.",
+        );
+      }
+    });
+  };
+
+  const refreshProfileAnalytics = () => {
+    startAnalyticsTransition(async () => {
+      try {
+        if (!selectedClientId) {
+          setProfileAnalytics(null);
+          return;
+        }
+
+        const response = await fetch(`/api/clients?analytics=1&clientId=${selectedClientId}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const raw = (await response.json()) as unknown;
+
+        if (!response.ok) {
+          const message =
+            typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
+              ? raw.error
+              : "No se pudo leer la analítica de perfil.";
+
+          throw new Error(message);
+        }
+
+        const data = clientProfileAnalyticsResponseSchema.parse(raw);
+        setProfileAnalytics(data.analytics);
+        setStorageMode(data.storage);
+      } catch (caughtError) {
+        setProfileAnalytics(null);
+        setHistoryError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "No se pudo leer la analítica de perfil.",
         );
       }
     });
@@ -982,6 +1097,19 @@ export function TrainingWorkspace({
     }
 
     refreshHistory();
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (
+      bootstrap &&
+      !skippedBootstrapAnalytics.current &&
+      selectedClientId === bootstrap.selectedClientId
+    ) {
+      skippedBootstrapAnalytics.current = true;
+      return;
+    }
+
+    refreshProfileAnalytics();
   }, [selectedClientId]);
 
   useEffect(() => {
@@ -1087,6 +1215,7 @@ export function TrainingWorkspace({
         );
 
         refreshHistory();
+        refreshProfileAnalytics();
       } catch (caughtError) {
         setSaveMessage(null);
         setHistoryError(
@@ -1529,8 +1658,8 @@ export function TrainingWorkspace({
                       <span className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.18em] ${connectionTone[storageMode]}`}>
                         {persistenceEnabled ? "storage live" : "preview"}
                       </span>
-                      <span className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.18em] ${readinessTone[analysis.readiness.status]}`}>
-                        {readinessPalette[analysis.readiness.status].label}
+                      <span className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.18em] ${readinessTone[profileReadiness.status]}`}>
+                        {readinessPalette[profileReadiness.status].label}
                       </span>
                     </div>
 
@@ -1539,8 +1668,8 @@ export function TrainingWorkspace({
                         <div
                           className="flex h-24 w-24 items-center justify-center rounded-full border-4 bg-[#0d1724] text-3xl font-semibold text-white shadow-[0_0_35px_rgba(0,0,0,0.24)] sm:h-30 sm:w-30 sm:text-4xl sm:shadow-[0_0_50px_rgba(0,0,0,0.28)]"
                           style={{
-                            borderColor: readinessPalette[analysis.readiness.status].solid,
-                            boxShadow: `0 0 0 7px ${readinessPalette[analysis.readiness.status].soft}`,
+                            borderColor: readinessPalette[profileReadiness.status].solid,
+                            boxShadow: `0 0 0 7px ${readinessPalette[profileReadiness.status].soft}`,
                           }}
                         >
                           {selectedClient?.fullName.slice(0, 2).toUpperCase() ?? "MU"}
@@ -1595,31 +1724,31 @@ export function TrainingWorkspace({
 
               <section className="rounded-[2.35rem] border border-white/8 bg-[#08111a] p-3 shadow-[0_24px_80px_rgba(2,6,23,0.3)] md:p-4">
                 <div className="grid gap-3 lg:grid-cols-[0.9fr_1.05fr_0.92fr]">
-                  <article onClick={openReadinessSheet} className={`cursor-pointer rounded-[1.9rem] border p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30 ${analysis.readiness.status === "red" ? "border-rose-400/35 bg-[linear-gradient(180deg,rgba(127,29,29,0.9),rgba(76,5,25,0.92))]" : "border-white/8 bg-[#0d1724]"}`}>
+                  <article onClick={openReadinessSheet} className={`cursor-pointer rounded-[1.9rem] border p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30 ${profileReadiness.status === "red" ? "border-rose-400/35 bg-[linear-gradient(180deg,rgba(127,29,29,0.9),rgba(76,5,25,0.92))]" : "border-white/8 bg-[#0d1724]"}`}>
                     <p className="text-sm uppercase tracking-[0.24em] text-white/45">Readiness SNC</p>
                     <div className="mt-4 flex justify-center">
                       <div
                         className="relative flex h-36 w-36 items-center justify-center rounded-full md:h-40 md:w-40"
                         style={{
-                          background: `conic-gradient(${readinessPalette[analysis.readiness.status].solid} ${analysis.readiness.score}%, rgba(96,165,250,0.14) 0)`,
-                          boxShadow: `inset 0 0 0 10px rgba(255,255,255,0.03), 0 0 0 12px ${readinessPalette[analysis.readiness.status].soft}`,
+                          background: `conic-gradient(${readinessPalette[profileReadiness.status].solid} ${profileReadiness.score}%, rgba(96,165,250,0.14) 0)`,
+                          boxShadow: `inset 0 0 0 10px rgba(255,255,255,0.03), 0 0 0 12px ${readinessPalette[profileReadiness.status].soft}`,
                         }}
                       >
                         <div className="absolute inset-[12px] rounded-full bg-[#0b1622]" />
                         <div className="absolute inset-[18px] rounded-full border border-white/8 md:inset-[20px]" />
                         <div className="relative z-10 text-center text-white">
-                          <p className="text-5xl font-semibold leading-none md:text-6xl">{analysis.readiness.score}</p>
+                          <p className="text-5xl font-semibold leading-none md:text-6xl">{profileReadiness.score}</p>
                           <p className="mt-2 text-[11px] uppercase tracking-[0.28em] text-white/55 md:mt-3 md:text-[12px] md:tracking-[0.34em]">Readiness</p>
                         </div>
                       </div>
                     </div>
                       <div className="mt-5 text-center text-white">
-                        <p className="text-xl font-semibold md:text-2xl">{readinessPalette[analysis.readiness.status].label}</p>
+                        <p className="text-xl font-semibold md:text-2xl">{readinessPalette[profileReadiness.status].label}</p>
                         <p className="mx-auto mt-3 max-w-[18rem] text-sm leading-7 text-white/72 md:text-base md:leading-8">
-                        Penalidad central {formatRounded(analysis.readiness.centralPenalty)}. Si ayer hubo mucho tonelaje o compuestos pesados, hoy conviene regular agresividad.
+                        Penalidad central {formatRounded(profileReadiness.centralPenalty)}. Si ayer hubo mucho tonelaje o compuestos pesados, hoy conviene regular agresividad.
                       </p>
                     </div>
-                    {analysis.readiness.status === "red" ? (
+                    {profileReadiness.status === "red" ? (
                       <div className="mt-5 rounded-[1.5rem] border-2 border-rose-300/60 bg-rose-950/40 p-4 text-rose-100">
                         <p className="text-xs font-semibold uppercase tracking-[0.18em]">Alerta crítica</p>
                         <p className="mt-2 text-lg font-semibold">Fatiga Alta Detectada - Priorizar Recuperación</p>
@@ -1629,29 +1758,29 @@ export function TrainingWorkspace({
                   </article>
 
                   <article onClick={openMetabolicSheet} className="cursor-pointer rounded-[1.9rem] border border-white/8 bg-[#0d1724] p-5 transition hover:-translate-y-0.5 hover:border-[#4cb894]/30">
-                    <p className="text-sm uppercase tracking-[0.24em] text-white/45">Estado metabolico</p>
+                    <p className="text-sm uppercase tracking-[0.24em] text-white/45">Costo neural semanal</p>
                     <div className="mt-5 flex items-end justify-between gap-3 text-white">
-                      <p className="text-4xl font-semibold leading-none md:text-5xl">{projectedIntakeKcal}</p>
-                      <p className="pb-1 text-sm text-white/58">objetivo {targetIntakeKcal} kcal</p>
+                      <p className="text-4xl font-semibold leading-none md:text-5xl">{weeklyNeuralCost}</p>
+                      <p className="pb-1 text-sm text-white/58">objetivo {weeklyNeuralTarget}</p>
                     </div>
                     <p className="mt-4 max-w-[22rem] text-sm leading-7 text-white/72 md:text-base md:leading-8">
-                      Ingesta proyectada hoy combinando carga del draft, ratio de carbos e hidratacion objetivo.
+                      Delta semanal {weeklyNeuralDelta > 0 ? "+" : ""}{weeklyNeuralDelta}. Gap de recuperación dinámica {recoveryGapHours}h.
                     </p>
                     <div className="mt-5 h-3 rounded-full bg-black/30">
                       <div
                         className="h-3 rounded-full bg-gradient-to-r from-[#4cb894] via-[#6fd8b6] to-[#9cf3d3]"
-                        style={{ width: `${Math.max(intakeProgress, 10)}%` }}
+                        style={{ width: `${Math.max(Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100), 10)}%` }}
                       />
                     </div>
-                    <p className="mt-3 text-xs uppercase tracking-[0.22em] text-white/45">{intakeProgress}% cubierto</p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.22em] text-white/45">{Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100)}% del objetivo</p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-4">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Carbos ratio</p>
-                        <p className="mt-3 text-3xl font-semibold text-white md:text-4xl">{session.recoveryInputs.carbsTargetRatio.toFixed(2)}</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Support ratio</p>
+                        <p className="mt-3 text-3xl font-semibold text-white md:text-4xl">{nutritionSupportRatio.toFixed(2)}</p>
                       </div>
                       <div className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-4">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Hidratacion ratio</p>
-                        <p className="mt-3 text-3xl font-semibold text-white md:text-4xl">{session.recoveryInputs.hydrationTargetRatio.toFixed(2)}</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Gap nutricional</p>
+                        <p className="mt-3 text-3xl font-semibold text-white md:text-4xl">{Math.round(nutritionRecoveryGap * 100)}%</p>
                       </div>
                     </div>
                   </article>
@@ -1706,8 +1835,12 @@ export function TrainingWorkspace({
                         <h2 className="mt-2 text-3xl font-semibold text-white">Huella deportiva del último mes</h2>
                       </div>
                       <div className="rounded-[1.25rem] border border-white/10 bg-white/6 px-4 py-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Eje más flojo</p>
-                        <p className="mt-2 text-sm font-semibold text-white">{weakestBiomechanicalAxis?.label ?? "Sin data"}</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Plan de referencia</p>
+                        <p className="mt-2 text-sm font-semibold text-white">{referencePlanLabel}</p>
+                        <p className="mt-1 text-xs text-white/55">Eje más flojo: {weakestBiomechanicalAxis?.label ?? "Sin data"}</p>
+                        {isRefreshingAnalytics ? (
+                          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-white/45">actualizando analítica...</p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="mt-6">
@@ -1826,17 +1959,17 @@ export function TrainingWorkspace({
                   <article className="rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)]">
                     <p className="text-sm uppercase tracking-[0.24em] text-white/45">Balance de vectores</p>
                     <div className="mt-4 grid gap-3">
-                      {analysis.stimulusBalance.map((slice) => (
+                      {profileStimulusBalance.map((slice) => (
                         <div key={slice.stimulusVector} className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
                           <div className="flex items-center justify-between gap-3">
                             <p className="font-medium text-white">{stimulusLabel[slice.stimulusVector]}</p>
-                            <span className="text-sm text-white/55">{slice.totalSets} sets</span>
+                            <span className="text-sm text-white/55">{slice.totalSets} sets · objetivo {slice.targetSets.toFixed(1)}</span>
                           </div>
                           <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
                             <div
                               className="h-full rounded-full bg-[#4cb894]"
                               style={{
-                                width: `${Math.max((slice.totalSets / Math.max(analysis.summary.totalSets, 1)) * 100, 8)}%`,
+                                width: `${Math.max((slice.totalSets / Math.max(slice.targetSets, 1)) * 100, 8)}%`,
                               }}
                             />
                           </div>
