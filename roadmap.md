@@ -1641,3 +1641,89 @@ Solo web:
 - El shell navegable queda acotado a dominios (main) y (lab) via (app-shell).
 - /session opera fuera del shell con experiencia inmersiva real y sin chrome global.
 - La navegacion entre Home y Lab mantiene continuidad de layout sin remount del chrome.
+
+## 49) Confirmacion Operativa Etapa 1 - Catalogo Lab (2026-04-30)
+
+- Estado: confirmada.
+- Objetivo de confirmacion: validar que el catalogo de /lab/exercises sigue operativo luego de M5 y antes de avanzar con Etapa 2.
+
+### Verificaciones ejecutadas
+
+- Gate tecnico:
+    - npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web.
+- Gate funcional API:
+    - request validada: GET /api/lab/exercises?q=press&vector=fuerza.
+    - respuesta:
+        - status=connected
+        - storage=supabase
+        - total=5
+        - muestra: Press inclinado, Press banca con barra, Press militar.
+- Gate funcional UI:
+    - ruta validada: /lab/exercises?q=press&vector=fuerza.
+    - buscador hidrata q=press.
+    - filtro vector refleja FUERZA.
+    - listado visible filtrado sin errores de runtime.
+
+### Evidencia
+
+- Etapa 1 queda confirmada como baseline estable para evolucionar hacia constructor de templates.
+
+## 50) Ejecucion Etapa 2 - Constructor de Templates con costo neural (2026-04-30)
+
+- Estado: completada.
+- Objetivo ejecutado: implementar constructor real en /lab/templates con persistencia SQL, endpoints dedicados y costo neural estimado en vivo.
+
+### Cambios aplicados
+
+- Persistencia de templates (dominio Lab):
+    - archivo nuevo: apps/web/src/lib/lab/template-persistence.ts.
+    - capacidades:
+        - listado de templates con resumen (entryCount, estimatedNeuralCost, updatedAt).
+        - detalle por id con entries + setTargets.
+        - create y update con reemplazo atomico de entries/sets.
+        - fallback preview cuando Supabase no esta configurado.
+- API Etapa 2:
+    - archivo nuevo: apps/web/src/app/api/lab/templates/route.ts.
+        - GET listado de templates.
+        - POST alta de template blueprint.
+    - archivo nuevo: apps/web/src/app/api/lab/templates/[id]/route.ts.
+        - GET detalle por id.
+        - PATCH actualizacion de template existente.
+- UI Builder de templates:
+    - archivo nuevo: apps/web/src/components/lab/template-builder.tsx.
+    - funcionalidades:
+        - listado lateral de templates.
+        - draft nuevo desde UI.
+        - edicion de metadata (name, sessionKind, goal, description).
+        - alta/baja de ejercicios por entrada.
+        - edicion de sets/reps/rpe por entrada.
+        - costo neural estimado en vivo por template y por entrada.
+        - guardado via API (POST/PATCH).
+- Integracion de pagina Lab templates:
+    - archivo actualizado: apps/web/src/app/(app-shell)/(lab)/lab/templates/page.tsx.
+    - la pagina deja placeholder y monta builder real con datos iniciales server-side.
+
+### Gate tecnico Etapa 2
+
+- npm.cmd run typecheck en verde para @musculator/contracts, @musculator/domain y @musculator/web: aprobado.
+
+### Gate funcional Etapa 2 (runtime)
+
+- Verificacion de UI:
+    - /lab/templates renderiza Constructor de rutinas.
+    - card de Costo neural estimado visible y reactiva.
+    - acciones Nuevo y Guardar template disponibles.
+- Verificacion de API create/list:
+    - POST /api/lab/templates con payload valido retorna:
+        - saveStatus=saved
+        - status=connected
+        - storage=supabase
+        - template persisted con id UUID.
+    - GET /api/lab/templates despues del POST:
+        - listado contiene el template nuevo Stage2 Smoke Template.
+        - total templates incrementado y ordenado por updatedAt.
+
+### Evidencia funcional
+
+- Etapa 2 pasa de placeholder a constructor operativo con persistencia real.
+- El costo neural por template queda trazable y actualizado en vivo durante la edicion.
