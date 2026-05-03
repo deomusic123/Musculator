@@ -7,6 +7,7 @@ const tabs = [
   { href: "/lab/exercises", label: "Ejercicios" },
   { href: "/lab/templates", label: "Rutinas" },
   { href: "/lab/protocols", label: "Protocolos" },
+  { href: "/lab/sessions", label: "Sesiones" },
 ];
 
 export function LabTabs() {

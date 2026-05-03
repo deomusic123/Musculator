@@ -1995,3 +1995,44 @@ Solo web:
 
 - El usuario puede registrar una sesion de fecha pasada desde el mismo panel operativo.
 - El historial y el heatmap usan started_at persistido, por lo que la sesion impacta el dia real entrenado.
+
+## 57) Feature Lab - Sesiones con calendario y constructor retroactivo (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: agregar en Training Lab una seccion Sesiones (al lado de Protocolos) con calendario pintado por actividad diaria y constructor para cargar entrenamientos de dias pasados fuera del flujo LIVE.
+
+### Cambios aplicados
+
+- Navegacion de Lab extendida:
+    - archivo actualizado: apps/web/src/components/lab/lab-tabs.tsx.
+    - nuevo tab/boton: Sesiones -> /lab/sessions.
+- Nueva superficie de Lab Sessions:
+    - archivo nuevo: apps/web/src/app/(app-shell)/(lab)/lab/sessions/page.tsx.
+    - carga server-side de clientes, catalogo de ejercicios e historial inicial del cliente activo.
+- Nueva UI cliente para sesiones:
+    - archivo nuevo: apps/web/src/components/lab/lab-sessions-board.tsx.
+    - calendario mensual con celdas coloreadas por cantidad de sesiones del dia.
+    - detalle por dia seleccionado con listado de sesiones guardadas.
+    - constructor de sesion retroactiva:
+        - fecha/hora editable.
+        - recovery inputs.
+        - selector de ejercicios del catalogo real.
+        - editor de sets (kg, reps, rpe).
+    - guardado via POST /api/training/sessions con x-client-id.
+    - refresco de historial via GET /api/training/sessions para repintar calendario.
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- URL validada: /lab/sessions.
+- Tabs de Lab visibles con nuevo boton Sesiones junto a Protocolos.
+- Calendario renderiza dias y se pinta cuando hay sesiones (ejemplo detectado: 2026-04-29 con 1 sesion).
+- Constructor visible con controles de fecha/hora y carga de ejercicios para backfill manual.
+
+### Evidencia funcional
+
+- El usuario puede completar historial faltante sin entrar al modo LIVE del mismo dia.
+- El calendario de Lab refleja consistencia real por dia para apoyar auditoria de adherencia.
