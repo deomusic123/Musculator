@@ -694,6 +694,8 @@ export function TrainingWorkspace({
   const weeklyNeuralCost = profileAnalytics?.weeklyNeuralCost ?? Number((analysis.summary.totalSets * 7.4).toFixed(1));
   const weeklyNeuralTarget = profileAnalytics?.weeklyNeuralTarget ?? weeklyNeuralCost;
   const weeklyNeuralDelta = profileAnalytics?.weeklyNeuralDelta ?? 0;
+  const weeklyNeuralProgressPercent = Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100);
+  const weeklyNeuralProgressBarPercent = clamp(weeklyNeuralProgressPercent, 10, 100);
   const recoveryGapHours = profileAnalytics?.recoveryGapHours ?? 0;
   const nutritionRecoveryGap = profileAnalytics?.nutritionRecoveryGap ?? 0;
   const nutritionSupportRatio =
@@ -1766,13 +1768,13 @@ export function TrainingWorkspace({
                     <p className="mt-4 max-w-[22rem] text-sm leading-7 text-white/72 md:text-base md:leading-8">
                       Delta semanal {weeklyNeuralDelta > 0 ? "+" : ""}{weeklyNeuralDelta}. Gap de recuperación dinámica {recoveryGapHours}h.
                     </p>
-                    <div className="mt-5 h-3 rounded-full bg-black/30">
+                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-black/30">
                       <div
                         className="h-3 rounded-full bg-gradient-to-r from-[#4cb894] via-[#6fd8b6] to-[#9cf3d3]"
-                        style={{ width: `${Math.max(Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100), 10)}%` }}
+                        style={{ width: `${weeklyNeuralProgressBarPercent}%` }}
                       />
                     </div>
-                    <p className="mt-3 text-xs uppercase tracking-[0.22em] text-white/45">{Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100)}% del objetivo</p>
+                    <p className="mt-3 text-xs uppercase tracking-[0.22em] text-white/45">{weeklyNeuralProgressPercent}% del objetivo</p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-4">
                         <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Support ratio</p>

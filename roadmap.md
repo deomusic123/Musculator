@@ -1867,3 +1867,26 @@ Solo web:
 - El motor deja de colapsar a readiness extremo en un caso con baja cobertura de plan.
 - El target neural semanal deja de quedar subestimado por fallback minimo (16.8 -> 89.3 en el caso smoke).
 - El radar mantiene comparativa real vs objetivo con objetivos enriquecidos por historial cuando el template/protocolo viene incompleto.
+
+## 53) Hotfix UI - Barra de progreso neural fuera de card (2026-05-03)
+
+- Estado: completado.
+- Incidente: en Perfil Pro, la barra de "Costo neural semanal" podia desbordar visualmente su contenedor cuando el porcentaje superaba 100% del objetivo (ej: 161%), invadiendo la card contigua.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+- Correcciones:
+    - se calcula porcentaje real una sola vez: weeklyNeuralProgressPercent.
+    - se desacopla ancho visual de barra con clamp operativo: weeklyNeuralProgressBarPercent (10..100).
+    - el contenedor de la barra ahora usa overflow-hidden para garantizar recorte dentro del radio.
+    - el texto conserva el porcentaje real (ej: 161% del objetivo) sin truncar señal analitica.
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Evidencia funcional esperada
+
+- La barra de progreso ya no puede exceder el ancho de la card.
+- El indicador textual mantiene el valor real por encima de 100% para lectura operativa.
