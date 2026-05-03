@@ -10,7 +10,7 @@ import {
   type TrainingSessionEntry,
   type WorkoutDraftSet,
 } from "@musculator/contracts";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { LabExerciseListItem } from "@/lib/lab/persistence";
 
 interface LabSessionsBoardProps {
@@ -26,6 +26,12 @@ interface CalendarCell {
   dateKey: string;
   inCurrentMonth: boolean;
   sessionCount: number;
+}
+
+interface RankedExerciseOption {
+  exercise: LabExerciseListItem;
+  score: number;
+  recentIndex: number;
 }
 
 const weekdayLabels = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
@@ -44,6 +50,85 @@ const knownMuscleSlugs: MuscleGroupSlug[] = [
   "pantorrilla",
 ];
 const knownMuscleSlugSet = new Set<string>(knownMuscleSlugs);
+const exercisePickerRecentStorageKey = "lab-sessions-recent-exercises";
+
+function normalizeSearchTerm(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function humanizeTag(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function stimulusVectorLabel(value: LabExerciseListItem["stimulusVector"]) {
+  if (value === "cardio_metabolico") {
+    return "Cardio metabolico";
+  }
+
+  return humanizeTag(value);
+}
+
+function rankExercise(
+  exercise: LabExerciseListItem,
+  query: string,
+  recentIndex: number,
+): RankedExerciseOption | null {
+  const name = normalizeSearchTerm(exercise.name);
+  const muscle = normalizeSearchTerm(exercise.primaryMuscle.name);
+  const movement = normalizeSearchTerm(humanizeTag(exercise.movementPattern));
+  const stimulus = normalizeSearchTerm(stimulusVectorLabel(exercise.stimulusVector));
+  const equipment = normalizeSearchTerm(exercise.equipment);
+  const slug = normalizeSearchTerm(exercise.slug);
+  let score = 0;
+
+  if (!query) {
+    score = recentIndex >= 0 ? 500 - recentIndex * 10 : 0;
+  } else {
+    if (name === query) {
+      score += 240;
+    } else if (name.startsWith(query)) {
+      score += 180;
+    } else if (name.includes(query)) {
+      score += 120;
+    }
+
+    if (muscle.includes(query)) {
+      score += 90;
+    }
+
+    if (movement.includes(query)) {
+      score += 70;
+    }
+
+    if (stimulus.includes(query)) {
+      score += 70;
+    }
+
+    if (equipment.includes(query)) {
+      score += 50;
+    }
+
+    if (slug.includes(query)) {
+      score += 45;
+    }
+
+    if (recentIndex >= 0) {
+      score += Math.max(40 - recentIndex, 8);
+    }
+  }
+
+  if (query && score === 0) {
+    return null;
+  }
+
+  return {
+    exercise,
+    score,
+    recentIndex,
+  };
+}
 
 function getDateKey(value: string | Date) {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -254,16 +339,122 @@ export function LabSessionsBoard({
   const [selectedDayKey, setSelectedDayKey] = useState(getDateKey(new Date()));
   const [draft, setDraft] = useState<TrainingSessionDraft>(() => createDraftSession());
   const [selectedExerciseSlug, setSelectedExerciseSlug] = useState(exerciseCatalog[0]?.slug ?? "");
+  const [exerciseSearchQuery, setExerciseSearchQuery] = useState("");
+  const [recentExerciseSlugs, setRecentExerciseSlugs] = useState<string[]>([]);
+  const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false);
+  const [highlightedExerciseIndex, setHighlightedExerciseIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [isSaving, startSavingTransition] = useTransition();
+  const exercisePickerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
   const exerciseBySlug = useMemo(
     () => new Map(exerciseCatalog.map((exercise) => [exercise.slug, exercise])),
     [exerciseCatalog],
   );
+  const normalizedExerciseQuery = useMemo(() => normalizeSearchTerm(exerciseSearchQuery), [exerciseSearchQuery]);
+  const rankedExerciseOptions = useMemo(() => {
+    const ranked = exerciseCatalog
+      .map((exercise) => {
+        const recentIndex = recentExerciseSlugs.indexOf(exercise.slug);
+        return rankExercise(exercise, normalizedExerciseQuery, recentIndex);
+      })
+      .filter((option): option is RankedExerciseOption => option !== null)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+
+        if (left.recentIndex >= 0 && right.recentIndex >= 0 && left.recentIndex !== right.recentIndex) {
+          return left.recentIndex - right.recentIndex;
+        }
+
+        if (left.recentIndex >= 0 && right.recentIndex < 0) {
+          return -1;
+        }
+
+        if (left.recentIndex < 0 && right.recentIndex >= 0) {
+          return 1;
+        }
+
+        return left.exercise.name.localeCompare(right.exercise.name, "es");
+      });
+
+    return ranked.slice(0, 80);
+  }, [exerciseCatalog, normalizedExerciseQuery, recentExerciseSlugs]);
+  const highlightedExercise = rankedExerciseOptions[highlightedExerciseIndex]?.exercise ?? null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(exercisePickerRecentStorageKey);
+
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      setRecentExerciseSlugs(parsed.filter((item): item is string => typeof item === "string").slice(0, 8));
+    } catch {
+      // Ignore malformed localStorage payloads and continue with empty recents.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isExercisePickerOpen) {
+      return;
+    }
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (exercisePickerRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsExercisePickerOpen(false);
+    };
+
+    window.addEventListener("mousedown", onPointerDown);
+
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [isExercisePickerOpen]);
+
+  useEffect(() => {
+    const firstOption = rankedExerciseOptions[0];
+
+    setHighlightedExerciseIndex((current) => {
+      if (rankedExerciseOptions.length === 0) {
+        return 0;
+      }
+
+      return Math.min(current, rankedExerciseOptions.length - 1);
+    });
+
+    if (rankedExerciseOptions.length === 0) {
+      return;
+    }
+
+    if (firstOption && !rankedExerciseOptions.some((option) => option.exercise.slug === selectedExerciseSlug)) {
+      setSelectedExerciseSlug(firstOption.exercise.slug);
+    }
+  }, [rankedExerciseOptions, selectedExerciseSlug]);
 
   const sessionsByDay = useMemo(() => {
     return history.reduce((accumulator, session) => {
@@ -328,8 +519,9 @@ export function LabSessionsBoard({
     }));
   };
 
-  const addExerciseToDraft = () => {
-    const exercise = exerciseBySlug.get(selectedExerciseSlug);
+  const addExerciseToDraft = (requestedSlug?: string) => {
+    const resolvedSlug = requestedSlug ?? highlightedExercise?.slug ?? selectedExerciseSlug;
+    const exercise = exerciseBySlug.get(resolvedSlug);
 
     if (!exercise) {
       return;
@@ -339,6 +531,79 @@ export function LabSessionsBoard({
       ...current,
       entries: [...current.entries, toSessionEntry(exercise)],
     }));
+
+    setRecentExerciseSlugs((current) => {
+      const next = [exercise.slug, ...current.filter((item) => item !== exercise.slug)].slice(0, 8);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(exercisePickerRecentStorageKey, JSON.stringify(next));
+      }
+
+      return next;
+    });
+
+    setSelectedExerciseSlug(exercise.slug);
+    setExerciseSearchQuery("");
+    setHighlightedExerciseIndex(0);
+    setIsExercisePickerOpen(false);
+  };
+
+  const onExercisePickerKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+
+      if (!isExercisePickerOpen) {
+        setIsExercisePickerOpen(true);
+        return;
+      }
+
+      setHighlightedExerciseIndex((current) => {
+        if (rankedExerciseOptions.length === 0) {
+          return 0;
+        }
+
+        return (current + 1) % rankedExerciseOptions.length;
+      });
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+
+      if (!isExercisePickerOpen) {
+        setIsExercisePickerOpen(true);
+        return;
+      }
+
+      setHighlightedExerciseIndex((current) => {
+        if (rankedExerciseOptions.length === 0) {
+          return 0;
+        }
+
+        return (current - 1 + rankedExerciseOptions.length) % rankedExerciseOptions.length;
+      });
+      return;
+    }
+
+    if (event.key === "Enter") {
+      if (!isExercisePickerOpen || !highlightedExercise) {
+        return;
+      }
+
+      event.preventDefault();
+      addExerciseToDraft(highlightedExercise.slug);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (!isExercisePickerOpen) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsExercisePickerOpen(false);
+      setHighlightedExerciseIndex(0);
+    }
   };
 
   const removeEntry = (entryIndex: number) => {
@@ -728,20 +993,75 @@ export function LabSessionsBoard({
         <div className="mt-5 rounded-[1.2rem] border border-[var(--border)] bg-white/70 p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Agregar ejercicios</p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <select
-              value={selectedExerciseSlug}
-              onChange={(event) => setSelectedExerciseSlug(event.target.value)}
-              className="min-h-11 flex-1 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none"
-            >
-              {exerciseCatalog.map((exercise) => (
-                <option key={exercise.slug} value={exercise.slug}>
-                  {exercise.name} · {exercise.primaryMuscle.name}
-                </option>
-              ))}
-            </select>
+            <div ref={exercisePickerRef} className="relative flex-1">
+              <input
+                value={exerciseSearchQuery}
+                onFocus={() => setIsExercisePickerOpen(true)}
+                onChange={(event) => {
+                  setExerciseSearchQuery(event.target.value);
+                  setIsExercisePickerOpen(true);
+                  setHighlightedExerciseIndex(0);
+                }}
+                onKeyDown={onExercisePickerKeyDown}
+                placeholder="Busca por ejercicio, musculo, patron o vector"
+                className="min-h-11 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none"
+              />
+
+              {isExercisePickerOpen ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-20 max-h-72 overflow-y-auto rounded-xl border border-slate-300 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.2)]">
+                  {rankedExerciseOptions.length > 0 ? (
+                    rankedExerciseOptions.map((option, index) => {
+                      const active = highlightedExerciseIndex === index;
+                      const recent = option.recentIndex >= 0;
+
+                      return (
+                        <button
+                          key={option.exercise.slug}
+                          type="button"
+                          onClick={() => addExerciseToDraft(option.exercise.slug)}
+                          onMouseEnter={() => setHighlightedExerciseIndex(index)}
+                          className={`flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left transition ${
+                            active ? "bg-slate-950 text-white" : "text-[var(--ink)] hover:bg-slate-100"
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">{option.exercise.name}</span>
+                            <span className={`block truncate text-xs ${active ? "text-white/75" : "text-[var(--muted)]"}`}>
+                              {option.exercise.primaryMuscle.name} · {humanizeTag(option.exercise.movementPattern)}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {recent ? (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                  active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                Reciente
+                              </span>
+                            ) : null}
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                active ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-900"
+                              }`}
+                            >
+                              {stimulusVectorLabel(option.exercise.stimulusVector)}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-lg px-3 py-2 text-sm text-[var(--muted)]">
+                      No hay ejercicios que coincidan con tu busqueda.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
-              onClick={addExerciseToDraft}
+              onClick={() => addExerciseToDraft()}
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-900/20 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               + Agregar

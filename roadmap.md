@@ -1552,6 +1552,40 @@ Solo web:
         - sessionId
 - Superficie live cliente conectada al store:
     - archivo nuevo: apps/web/src/components/live/live-session-shell.tsx.
+
+## 48) Ejecucion Lab Sesiones - Selector de ejercicios rapido (2026-05-03)
+
+- Estado: completada.
+- Objetivo ejecutado: reemplazar el selector nativo del constructor de sesiones por un combobox buscable con ranking, metadatos legibles y atajos de teclado para cargar ejercicios mas rapido.
+
+### Cambios aplicados
+
+- Selector de ejercicios en constructor retroactivo actualizado:
+    - archivo actualizado: apps/web/src/components/lab/lab-sessions-board.tsx.
+    - se reemplaza el select nativo por input buscable con panel de resultados.
+- Ranking y descubrimiento de ejercicios:
+    - busqueda por nombre, musculo, patron de movimiento, vector de estimulo, equipo y slug.
+    - priorizacion de coincidencias exactas/iniciales y soporte de ranking por recientes.
+- UX operacional del picker:
+    - navegacion por teclado con ArrowUp/ArrowDown, Enter para agregar y Escape para cerrar.
+    - filas de resultado con nombre, metadatos biomecanicos y badge de vector.
+    - soporte de ejercicios recientes persistidos en localStorage para acelerar repeticion de cargas.
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde: aprobado.
+
+### Gate funcional (runtime)
+
+- Verificacion en /lab/sessions con dev server en http://localhost:3001.
+- Se valida apertura del combobox, filtrado por texto y agregado por teclado (Enter) al constructor.
+- Sin regresiones detectadas en calendario, detalle diario y boton de guardado de sesion.
+
+### Evidencia funcional
+
+- El bloque Agregar ejercicios ahora muestra input de busqueda en lugar de select nativo.
+- Al escribir "senta" se filtran variantes de sentadilla y Enter agrega el primer resultado al draft.
+- El constructor mantiene el flujo existente de sets/entradas y guardado retroactivo.
     - cronometro deriva del store (running/paused).
     - selector de set activo conectado al store.
     - controles de pausa/reanudar y reset live.
