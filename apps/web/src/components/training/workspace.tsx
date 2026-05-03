@@ -696,6 +696,7 @@ export function TrainingWorkspace({
   const weeklyNeuralDelta = profileAnalytics?.weeklyNeuralDelta ?? 0;
   const weeklyNeuralProgressPercent = Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100);
   const weeklyNeuralProgressBarPercent = clamp(weeklyNeuralProgressPercent, 10, 100);
+  const weeklyNeuralOverflowPercent = Math.max(weeklyNeuralProgressPercent - 100, 0);
   const recoveryGapHours = profileAnalytics?.recoveryGapHours ?? 0;
   const nutritionRecoveryGap = profileAnalytics?.nutritionRecoveryGap ?? 0;
   const nutritionSupportRatio =
@@ -1768,13 +1769,23 @@ export function TrainingWorkspace({
                     <p className="mt-4 max-w-[22rem] text-sm leading-7 text-white/72 md:text-base md:leading-8">
                       Delta semanal {weeklyNeuralDelta > 0 ? "+" : ""}{weeklyNeuralDelta}. Gap de recuperación dinámica {recoveryGapHours}h.
                     </p>
-                    <div className="mt-5 h-3 overflow-hidden rounded-full bg-black/30">
+                    <div className="relative mt-5 h-3 overflow-hidden rounded-full bg-black/30">
                       <div
                         className="h-3 rounded-full bg-gradient-to-r from-[#4cb894] via-[#6fd8b6] to-[#9cf3d3]"
                         style={{ width: `${weeklyNeuralProgressBarPercent}%` }}
                       />
+                      {weeklyNeuralOverflowPercent > 0 ? (
+                        <div className="absolute inset-y-0 right-0 w-[3px] bg-amber-200/90" />
+                      ) : null}
                     </div>
-                    <p className="mt-3 text-xs uppercase tracking-[0.22em] text-white/45">{weeklyNeuralProgressPercent}% del objetivo</p>
+                    <p className="mt-3 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.22em] text-white/45">
+                      <span>{weeklyNeuralProgressPercent}% del objetivo</span>
+                      {weeklyNeuralOverflowPercent > 0 ? (
+                        <span className="rounded-full border border-amber-200/45 bg-amber-300/15 px-2 py-1 text-[10px] font-semibold tracking-[0.16em] text-amber-100">
+                          Exceso +{weeklyNeuralOverflowPercent}%
+                        </span>
+                      ) : null}
+                    </p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-4">
                         <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Support ratio</p>

@@ -1890,3 +1890,32 @@ Solo web:
 
 - La barra de progreso ya no puede exceder el ancho de la card.
 - El indicador textual mantiene el valor real por encima de 100% para lectura operativa.
+
+## 54) Hotfix UI - Marcador de exceso sobre objetivo neural (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: cuando el costo neural semanal excede 100% del objetivo, mostrar explicitamente el exceso sin volver a desbordar la card.
+
+### Cambios aplicados
+
+- Archivo actualizado: apps/web/src/components/training/workspace.tsx.
+- Ajustes:
+    - se agrega weeklyNeuralOverflowPercent = max(weeklyNeuralProgressPercent - 100, 0).
+    - se incorpora marcador visual de saturacion en el borde derecho de la barra (cap en 100%).
+    - se agrega badge textual "Exceso +X%" junto al texto de porcentaje total.
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- Verificacion en / (cliente real):
+    - porcentaje visible: 161% del objetivo.
+    - badge visible: Exceso +61%.
+    - marcador de borde derecho renderizado en la barra saturada.
+
+### Evidencia funcional
+
+- Se conserva la lectura analitica real (>100%) y se agrega señal operativa clara de cuanto se excede.
+- No reaparece el desborde hacia la card contigua.
