@@ -223,18 +223,18 @@ function toSessionEntry(exercise: LabExerciseListItem): TrainingSessionEntry {
 
 function describeCalendarTone(sessionCount: number) {
   if (sessionCount >= 3) {
-    return "border-emerald-300/35 bg-emerald-500/55 text-white";
+    return "bg-emerald-500/70";
   }
 
   if (sessionCount === 2) {
-    return "border-emerald-300/30 bg-emerald-500/35 text-white";
+    return "bg-emerald-400/55";
   }
 
   if (sessionCount === 1) {
-    return "border-emerald-300/25 bg-emerald-500/20 text-emerald-100";
+    return "bg-emerald-300/45";
   }
 
-  return "border-white/10 bg-white/5 text-white/55";
+  return "bg-slate-50/90";
 }
 
 export function LabSessionsBoard({
@@ -502,6 +502,12 @@ export function LabSessionsBoard({
             {monthCells.map((cell) => {
               const active = cell.dateKey === selectedDayKey;
               const tone = describeCalendarTone(cell.sessionCount);
+              const dayNumberTone =
+                cell.sessionCount >= 2
+                  ? "text-white"
+                  : cell.sessionCount === 1
+                    ? "text-emerald-950"
+                    : "text-slate-700";
 
               return (
                 <button
@@ -514,12 +520,12 @@ export function LabSessionsBoard({
                       startedAt: withDateApplied(cell.date, current.startedAt),
                     }));
                   }}
-                  className={`relative min-h-14 rounded-xl border text-sm transition ${tone} ${
+                  className={`relative min-h-14 rounded-xl border border-slate-300/90 text-sm transition ${tone} ${
                     cell.inCurrentMonth ? "" : "opacity-45"
                   } ${active ? "ring-2 ring-slate-950" : "hover:border-slate-400/50"}`}
                   aria-label={`${cell.dateKey}: ${cell.sessionCount} sesiones`}
                 >
-                  <span className="text-xs">{cell.date.getDate()}</span>
+                  <span className={`text-sm font-semibold ${dayNumberTone}`}>{cell.date.getDate()}</span>
                   {cell.sessionCount > 0 ? (
                     <span className="absolute bottom-1 right-1 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] font-medium">
                       {cell.sessionCount}
