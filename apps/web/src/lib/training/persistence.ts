@@ -161,8 +161,73 @@ function getDateKey(value: string) {
   ).padStart(2, "0")}`;
 }
 
+function getWeekKey(value: string) {
+  const date = new Date(value);
+  const utcDate = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const startOfYear = Date.UTC(date.getUTCFullYear(), 0, 1);
+  const week = Math.floor((utcDate - startOfYear) / (7 * 24 * 60 * 60 * 1000));
+
+  return `${date.getUTCFullYear()}-${week}`;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function sumMapValues<T>(map: Map<T, number>) {
+  return [...map.values()].reduce((sum, value) => sum + value, 0);
+}
+
+function blendTargetMap<T>(
+  plannedMap: Map<T, number>,
+  actualMap: Map<T, number>,
+  options: { minimumPlanVolume: number; maxBlendWeight: number },
+) {
+  const plannedVolume = sumMapValues(plannedMap);
+  const actualVolume = sumMapValues(actualMap);
+
+  if (plannedVolume >= options.minimumPlanVolume || actualVolume <= 0) {
+    return new Map(plannedMap);
+  }
+
+  const deficitRatio = clamp(
+    (options.minimumPlanVolume - plannedVolume) / options.minimumPlanVolume,
+    0,
+    1,
+  );
+  const blendWeight = options.maxBlendWeight * deficitRatio;
+  const blended = new Map(plannedMap);
+
+  for (const [key, value] of actualMap.entries()) {
+    blended.set(key, (blended.get(key) ?? 0) + value * blendWeight);
+  }
+
+  return blended;
+}
+
+function calibrateWeeklyNeuralTarget(input: {
+  plannedTarget: number;
+  weeklyNeuralCost: number;
+  totalNeuralCost28: number;
+  observedWeeks: number;
+}) {
+  const observedWeeks = Math.max(input.observedWeeks, 1);
+  const historicalWeekly =
+    input.totalNeuralCost28 > 0
+      ? input.totalNeuralCost28 / observedWeeks
+      : input.weeklyNeuralCost;
+  const floor = Math.max(28, historicalWeekly * 0.85, input.weeklyNeuralCost * 0.62);
+  const ceiling = Math.max(floor, historicalWeekly * 1.25, input.weeklyNeuralCost * 1.2);
+
+  const target =
+    input.plannedTarget > 0
+      ? clamp(input.plannedTarget, floor, ceiling)
+      : clamp(historicalWeekly, floor, ceiling);
+
+  return {
+    calibratedTarget: Number(target.toFixed(1)),
+    historicalWeekly: Number(historicalWeekly.toFixed(1)),
+  };
 }
 
 async function getExerciseIdMap(slugs: string[]) {
@@ -325,6 +390,11 @@ function toRadarAxes(
 
   const maxActual = Math.max(...Object.values(actualAxis), 1);
   const maxTarget = Math.max(...Object.values(targetAxis), 1);
+  const gapPercent = (actual: number, target: number) => {
+    const denominator = Math.max(target, maxTarget * 0.45, 1);
+
+    return clamp(Math.round(((actual - target) / denominator) * 100), -100, 100);
+  };
 
   return [
     {
@@ -332,55 +402,35 @@ function toRadarAxes(
       label: "Traccion vertical",
       actualPercent: Math.round((actualAxis.verticalPull / maxActual) * 100),
       targetPercent: Math.round((targetAxis.verticalPull / maxTarget) * 100),
-      gapPercent: clamp(
-        Math.round(((actualAxis.verticalPull - targetAxis.verticalPull) / maxTarget) * 100),
-        -100,
-        100,
-      ),
+      gapPercent: gapPercent(actualAxis.verticalPull, targetAxis.verticalPull),
     },
     {
       key: "horizontalPull",
       label: "Traccion horizontal",
       actualPercent: Math.round((actualAxis.horizontalPull / maxActual) * 100),
       targetPercent: Math.round((targetAxis.horizontalPull / maxTarget) * 100),
-      gapPercent: clamp(
-        Math.round(((actualAxis.horizontalPull - targetAxis.horizontalPull) / maxTarget) * 100),
-        -100,
-        100,
-      ),
+      gapPercent: gapPercent(actualAxis.horizontalPull, targetAxis.horizontalPull),
     },
     {
       key: "push",
       label: "Empuje",
       actualPercent: Math.round((actualAxis.push / maxActual) * 100),
       targetPercent: Math.round((targetAxis.push / maxTarget) * 100),
-      gapPercent: clamp(
-        Math.round(((actualAxis.push - targetAxis.push) / maxTarget) * 100),
-        -100,
-        100,
-      ),
+      gapPercent: gapPercent(actualAxis.push, targetAxis.push),
     },
     {
       key: "posteriorChain",
       label: "Cadena posterior",
       actualPercent: Math.round((actualAxis.posteriorChain / maxActual) * 100),
       targetPercent: Math.round((targetAxis.posteriorChain / maxTarget) * 100),
-      gapPercent: clamp(
-        Math.round(((actualAxis.posteriorChain - targetAxis.posteriorChain) / maxTarget) * 100),
-        -100,
-        100,
-      ),
+      gapPercent: gapPercent(actualAxis.posteriorChain, targetAxis.posteriorChain),
     },
     {
       key: "conditioning",
       label: "Acondicionamiento",
       actualPercent: Math.round((actualAxis.conditioning / maxActual) * 100),
       targetPercent: Math.round((targetAxis.conditioning / maxTarget) * 100),
-      gapPercent: clamp(
-        Math.round(((actualAxis.conditioning - targetAxis.conditioning) / maxTarget) * 100),
-        -100,
-        100,
-      ),
+      gapPercent: gapPercent(actualAxis.conditioning, targetAxis.conditioning),
     },
   ];
 }
@@ -391,17 +441,28 @@ function computeReadinessFromTelemetry(input: {
   recoveryGapHours: number;
   nutritionRecoveryGap: number;
   activeDays: number;
+  weeklySessionCount: number;
+  observedWeeks: number;
 }): ReadinessBreakdown {
+  const coverageFactor = clamp(
+    0.45 + Math.min(input.observedWeeks, 4) * 0.1 + Math.min(input.weeklySessionCount, 5) * 0.06,
+    0.45,
+    1,
+  );
   const overloadRatio =
     input.weeklyNeuralTarget > 0
-      ? input.weeklyNeuralCost / input.weeklyNeuralTarget
+      ? clamp(input.weeklyNeuralCost / input.weeklyNeuralTarget, 0.35, 1.9)
       : input.weeklyNeuralCost > 0
         ? 1.2
         : 1;
-  const centralPenalty = Math.max(0, (overloadRatio - 1) * 34) + Math.min(input.recoveryGapHours * 0.5, 14);
-  const localPenalty = Math.min(input.recoveryGapHours * 0.55, 16) + input.nutritionRecoveryGap * 42;
-  const recoveryBonus = Math.min(input.activeDays * 1.9, 10);
-  const score = clamp(Math.round(82 - centralPenalty - localPenalty + recoveryBonus), 0, 100);
+  const centralPenalty =
+    Math.max(0, (overloadRatio - 1) * 28) * coverageFactor +
+    Math.min(input.recoveryGapHours, 72) * 0.08;
+  const localPenalty =
+    Math.min(input.recoveryGapHours, 72) * 0.11 + input.nutritionRecoveryGap * 24;
+  const recoveryBonus =
+    Math.min(input.activeDays * 2.6, 12) + (input.nutritionRecoveryGap < 0.08 ? 2 : 0);
+  const score = clamp(Math.round(76 - centralPenalty - localPenalty + recoveryBonus), 15, 98);
   const status: ReadinessBreakdown["status"] = score >= 70 ? "green" : score >= 45 ? "amber" : "red";
 
   return {
@@ -984,6 +1045,8 @@ export async function getClientProfileAnalytics(
   const weeklySessionIds = rows
     .filter((row) => new Date(row.started_at) >= window7)
     .map((row) => row.id);
+  const weeklySessionIdSet = new Set(weeklySessionIds);
+  const observedWeeks = Math.max(new Set(rows.map((row) => getWeekKey(row.started_at))).size, 1);
 
   const { data: entries, error: entriesError } = (await admin
     .from("workout_entries")
@@ -1047,6 +1110,7 @@ export async function getClientProfileAnalytics(
   const actualStimulus = createEmptyStimulusMap();
   const actualLoadByStimulus = createEmptyStimulusMap();
   let weeklyNeuralCost = 0;
+  let totalNeuralCost28 = 0;
 
   for (const entry of entryRows) {
     if (!entry.exercise_id) {
@@ -1074,8 +1138,11 @@ export async function getClientProfileAnalytics(
       (actualLoadByStimulus.get(exercise.stimulus_vector) ?? 0) + stats.loadKg,
     );
 
-    if (weeklySessionIds.includes(entry.session_id)) {
-      weeklyNeuralCost += setCount * (toNumber(exercise.cns_tax_multiplier) || 0);
+    const entryNeuralCost = setCount * (toNumber(exercise.cns_tax_multiplier) || 0);
+    totalNeuralCost28 += entryNeuralCost;
+
+    if (weeklySessionIdSet.has(entry.session_id)) {
+      weeklyNeuralCost += entryNeuralCost;
     }
   }
 
@@ -1114,10 +1181,7 @@ export async function getClientProfileAnalytics(
         ).toFixed(2),
       )
     : 1;
-  const targetSupportRatio = Number(clamp(1 + weeklyNeuralCost / 220, 1, 1.35).toFixed(2));
-  const nutritionRecoveryGap = Number(
-    Math.max(targetSupportRatio - nutritionSupportRatio, 0).toFixed(2),
-  );
+  const weeklyNeuralCostRounded = Number(weeklyNeuralCost.toFixed(1));
   const activeDays = new Set(
     rows
       .filter((row) => new Date(row.started_at) >= window7)
@@ -1125,16 +1189,41 @@ export async function getClientProfileAnalytics(
   ).size;
 
   const planTargets = await resolvePlanTargets(context.userId, clientId);
-  const weeklyNeuralTarget = planTargets.weeklyNeuralTarget;
-  const weeklyNeuralCostRounded = Number(weeklyNeuralCost.toFixed(1));
+  const calibratedTarget = calibrateWeeklyNeuralTarget({
+    plannedTarget: planTargets.weeklyNeuralTarget,
+    weeklyNeuralCost: weeklyNeuralCostRounded,
+    totalNeuralCost28,
+    observedWeeks,
+  });
+  const weeklyNeuralTarget = calibratedTarget.calibratedTarget;
+  const blendedTargetPattern = blendTargetMap(planTargets.targetPattern, actualPattern, {
+    minimumPlanVolume: 14,
+    maxBlendWeight: 0.42,
+  });
+  const blendedTargetStimulus = blendTargetMap(planTargets.targetStimulus, actualStimulus, {
+    minimumPlanVolume: 10,
+    maxBlendWeight: 0.38,
+  });
+  const targetSupportRatio = Number(
+    clamp(
+      weeklyNeuralTarget > 0 ? weeklyNeuralCostRounded / weeklyNeuralTarget : 1,
+      0.8,
+      1.35,
+    ).toFixed(2),
+  );
+  const nutritionRecoveryGap = Number(
+    Math.max(targetSupportRatio - nutritionSupportRatio, 0).toFixed(2),
+  );
   const weeklyNeuralDelta = Number((weeklyNeuralCostRounded - weeklyNeuralTarget).toFixed(1));
-  const radarAxes = toRadarAxes(actualPattern, planTargets.targetPattern);
+  const radarAxes = toRadarAxes(actualPattern, blendedTargetPattern);
   const readiness = computeReadinessFromTelemetry({
     weeklyNeuralCost: weeklyNeuralCostRounded,
     weeklyNeuralTarget,
     recoveryGapHours,
     nutritionRecoveryGap,
     activeDays,
+    weeklySessionCount: weeklySessionIds.length,
+    observedWeeks,
   });
 
   const responsePayload = {
@@ -1154,7 +1243,7 @@ export async function getClientProfileAnalytics(
       stimulusBalance: stimulusVectorOrder.map((stimulusVector) => ({
         stimulusVector,
         actualSets: Math.round(actualStimulus.get(stimulusVector) ?? 0),
-        targetSets: Number((planTargets.targetStimulus.get(stimulusVector) ?? 0).toFixed(1)),
+        targetSets: Number((blendedTargetStimulus.get(stimulusVector) ?? 0).toFixed(1)),
         actualLoadKg: Number((actualLoadByStimulus.get(stimulusVector) ?? 0).toFixed(1)),
       })),
       ...(planTargets.referenceTemplateName

@@ -1806,3 +1806,64 @@ Solo web:
     - Radar biomecanico con objetivo y gap por eje.
     - Plan de referencia visible (template/protocolo).
 - La analitica deja de depender solo de heuristicas locales del draft y queda trazada a datos persistidos por cliente.
+
+## 52) Ejecucion Etapa 3.1 - Calibracion de readiness y targets (2026-05-03)
+
+- Estado: completada.
+- Objetivo ejecutado: recalibrar el motor de perfil pro para evitar extremos en clientes con plan parcial o poco historial, estabilizando target neural, readiness y comparativas de radar.
+
+### Cambios aplicados
+
+- Calibracion de utilidades analiticas:
+    - archivo actualizado: apps/web/src/lib/training/persistence.ts.
+    - nuevas utilidades:
+        - getWeekKey: normaliza semanas observadas para estimar baseline historico real.
+        - sumMapValues y blendTargetMap: mezcla objetivo planificado con distribucion historica cuando el plan viene sub-especificado.
+        - calibrateWeeklyNeuralTarget: aplica piso/techo dinamico de target semanal usando costo semanal real + ventana de 28 dias.
+- Readiness mas estable en baja cobertura:
+    - computeReadinessFromTelemetry ahora incorpora:
+        - coverageFactor (semanas observadas + sesiones semanales).
+        - overloadRatio acotado para evitar cascadas extremas.
+        - penalidades central/local suavizadas y bonus de recuperacion ajustado.
+    - salida acotada a rango operativo (15..98) para evitar falsos ceros por ruido.
+- Integracion de calibracion en agregacion por cliente:
+    - getClientProfileAnalytics ahora:
+        - acumula totalNeuralCost28 y observedWeeks.
+        - calibra weeklyNeuralTarget desde planTargets.weeklyNeuralTarget.
+        - usa mapas objetivo blend para radarAxes y stimulusBalance.
+        - calcula targetSupportRatio en funcion de carga/target calibrado (en lugar de constante fija por carga bruta).
+        - evita costo O(n^2) en chequeo semanal usando Set de session ids.
+
+### Gate tecnico Etapa 3.1
+
+- npm.cmd run typecheck en verde para:
+    - @musculator/contracts
+    - @musculator/domain
+    - @musculator/web
+
+### Gate funcional Etapa 3.1 (runtime)
+
+- API analytics calibrada por cliente:
+    - GET /api/clients?analytics=1&clientId=80aeb197-30e7-4787-81b2-fb09aa25bc28
+    - respuesta validada (post calibracion):
+        - status=connected
+        - storage=supabase
+        - readiness score=57 (amber)
+        - weeklyNeuralCost=144
+        - weeklyNeuralTarget=89.3
+        - weeklyNeuralDelta=54.7
+        - nutritionRecoveryGap=0.35
+        - radarAxes=5
+        - stimulusBalance slices=6
+- API historial estable sin regresion:
+    - GET /api/training/sessions?clientId=80aeb197-30e7-4787-81b2-fb09aa25bc28&limit=6
+    - respuesta validada: status=connected, storage=supabase, sessions=2.
+- Nota de runtime observada durante smoke:
+    - se registro un 404 transitorio en /api/clients?analytics=1 durante recompilacion de /_not-found en dev.
+    - reintento inmediato devolvio 200 con payload valido, consistente con ruido de recompilacion de Next.js en caliente.
+
+### Evidencia funcional
+
+- El motor deja de colapsar a readiness extremo en un caso con baja cobertura de plan.
+- El target neural semanal deja de quedar subestimado por fallback minimo (16.8 -> 89.3 en el caso smoke).
+- El radar mantiene comparativa real vs objetivo con objetivos enriquecidos por historial cuando el template/protocolo viene incompleto.
