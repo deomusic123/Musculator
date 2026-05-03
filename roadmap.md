@@ -1962,3 +1962,36 @@ Solo web:
 
 - El usuario puede eliminar sesiones desde el perfil sin salir de la vista operativa.
 - La accion mantiene coherencia de datos al refrescar historial y analitica tras la eliminacion.
+
+## 56) Feature Sesiones - Carga retroactiva de entrenamientos pasados (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: habilitar carga manual de sesiones de dias anteriores (fecha/hora editable) para no perder historial cuando el atleta entreno y no lo registro en el momento.
+
+### Cambios aplicados
+
+- Contrato de sesion ampliado:
+    - archivo actualizado: packages/contracts/src/training.ts.
+    - trainingSessionDraftSchema ahora admite startedAt opcional (datetime).
+- Dominio de templates alineado:
+    - archivo actualizado: packages/domain/src/training.ts.
+    - createTrainingTemplateSession inicializa startedAt para que el draft tenga timestamp base editable.
+- Persistencia de sesiones:
+    - archivo actualizado: apps/web/src/lib/training/persistence.ts.
+    - saveTrainingSession usa session.startedAt cuando viene informado.
+    - si startedAt no viene, mantiene fallback a timestamp actual.
+    - validacion: startedAt invalido devuelve error controlado.
+- UI de carga de sesion:
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - nuevo campo "Fecha y hora de la sesion" (datetime-local) en el builder.
+    - conversion local <-> ISO para persistencia consistente.
+    - al cambiar de template se preserva startedAt elegido por el usuario.
+
+### Gate tecnico
+
+- npm.cmd run typecheck en verde para el monorepo (contracts, domain, web).
+
+### Evidencia funcional
+
+- El usuario puede registrar una sesion de fecha pasada desde el mismo panel operativo.
+- El historial y el heatmap usan started_at persistido, por lo que la sesion impacta el dia real entrenado.

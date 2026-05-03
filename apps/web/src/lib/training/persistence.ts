@@ -494,7 +494,13 @@ export async function saveTrainingSession(
   }
 
   const admin = createAdminSupabaseClient();
-  const now = new Date().toISOString();
+  const parsedStartedAt = session.startedAt ? new Date(session.startedAt) : null;
+
+  if (session.startedAt && (!parsedStartedAt || Number.isNaN(parsedStartedAt.getTime()))) {
+    throw new Error("La fecha de la sesion es invalida.");
+  }
+
+  const sessionTimestamp = parsedStartedAt?.toISOString() ?? new Date().toISOString();
   const notesWithMeta = appendSessionMeta(session.notes, session.recoveryInputs);
 
   if (!clientId) {
@@ -526,8 +532,8 @@ export async function saveTrainingSession(
       source: "manual",
       title: session.title,
       notes: notesWithMeta,
-      started_at: now,
-      ended_at: now,
+      started_at: sessionTimestamp,
+      ended_at: sessionTimestamp,
     })
     .select("id, started_at")
     .single()) as { data: InsertedSessionRow | null; error: { message: string } | null };
@@ -543,8 +549,8 @@ export async function saveTrainingSession(
         client_id: clientId,
         source: "manual",
         notes: encodeLegacyNotes(session.title, notesWithMeta),
-        started_at: now,
-        ended_at: now,
+        started_at: sessionTimestamp,
+        ended_at: sessionTimestamp,
       })
       .select("id, started_at")
       .single()) as { data: InsertedSessionRow | null; error: { message: string } | null };

@@ -227,6 +227,7 @@ export const trainingSessionEntrySchema = trainingExerciseCatalogItemSchema.exte
 export const trainingSessionDraftSchema = z.object({
   title: z.string().min(2).max(80),
   notes: z.string().max(240).optional(),
+  startedAt: z.string().datetime().optional(),
   entries: z.array(trainingSessionEntrySchema).min(1),
   recoveryInputs: trainingRecoveryInputsSchema,
 });

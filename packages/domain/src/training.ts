@@ -482,6 +482,7 @@ export function createTrainingTemplateSession(templateId: string): TrainingSessi
   return {
     title: template.name,
     notes: template.description,
+    startedAt: new Date().toISOString(),
     recoveryInputs: defaultRecoveryInputs,
     entries: template.entries.map((entry) => {
       if (!entry.exerciseSlug) {

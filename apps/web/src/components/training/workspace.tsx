@@ -523,6 +523,36 @@ function formatShortDate(value: string) {
   });
 }
 
+function toLocalDateTimeInputValue(value: string | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toIsoFromLocalDateTimeInput(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
 function formatRounded(value: number) {
   return new Intl.NumberFormat("es-AR", {
     maximumFractionDigits: value >= 100 ? 0 : 1,
@@ -1217,7 +1247,14 @@ export function TrainingWorkspace({
 
   const applyTemplate = (templateId: string) => {
     startTemplateTransition(() => {
-      setSession(createTrainingTemplateSession(templateId));
+      setSession((current) => {
+        const nextTemplateSession = createTrainingTemplateSession(templateId);
+
+        return {
+          ...nextTemplateSession,
+          startedAt: current.startedAt ?? nextTemplateSession.startedAt,
+        };
+      });
       setCompletedSets({});
       setCollapsedEntries({});
     });
@@ -2467,6 +2504,23 @@ export function TrainingWorkspace({
                           title: event.target.value,
                         }))
                       }
+                      className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition focus:border-[#4cb894]"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm text-white/62">
+                    Fecha y hora de la sesion
+                    <input
+                      type="datetime-local"
+                      max={toLocalDateTimeInputValue(new Date().toISOString())}
+                      value={toLocalDateTimeInputValue(session.startedAt)}
+                      onChange={(event) => {
+                        const rawValue = event.target.value;
+
+                        updateSession((current) => ({
+                          ...current,
+                          startedAt: rawValue ? (toIsoFromLocalDateTimeInput(rawValue) ?? current.startedAt) : undefined,
+                        }));
+                      }}
                       className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition focus:border-[#4cb894]"
                     />
                   </label>
