@@ -660,6 +660,7 @@ export function TrainingWorkspace({
   const [isCreatingClient, startClientTransition] = useTransition();
   const [isRefreshingHistory, startHistoryTransition] = useTransition();
   const [isRefreshingAnalytics, startAnalyticsTransition] = useTransition();
+  const [isDeletingSession, startDeleteSessionTransition] = useTransition();
   const [history, setHistory] = useState<PersistedTrainingSessionSummary[]>(bootstrap?.history ?? []);
   const [profileAnalytics, setProfileAnalytics] = useState<ClientProfileAnalytics | null>(
     bootstrap?.profileAnalytics ?? null,
@@ -668,6 +669,7 @@ export function TrainingWorkspace({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [selectedHeatmapDay, setSelectedHeatmapDay] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const skippedBootstrapHistory = useRef(false);
   const skippedBootstrapAnalytics = useRef(false);
 
@@ -1061,6 +1063,58 @@ export function TrainingWorkspace({
             ? caughtError.message
             : "No se pudo leer la analítica de perfil.",
         );
+      }
+    });
+  };
+
+  const deletePersistedSession = (sessionId: string) => {
+    if (!selectedClientId) {
+      setHistoryError("Primero selecciona un cliente.");
+      return;
+    }
+
+    const confirmed = window.confirm("¿Eliminar esta sesion del historial? Esta accion no se puede deshacer.");
+
+    if (!confirmed) {
+      return;
+    }
+
+    startDeleteSessionTransition(async () => {
+      try {
+        setHistoryError(null);
+        setSaveMessage(null);
+        setDeletingSessionId(sessionId);
+
+        const response = await fetch(
+          `/api/training/sessions?clientId=${selectedClientId}&sessionId=${sessionId}`,
+          {
+            method: "DELETE",
+          },
+        );
+        const raw = (await response.json()) as unknown;
+
+        if (!response.ok) {
+          const message =
+            typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
+              ? raw.error
+              : "No se pudo eliminar la sesion.";
+
+          throw new Error(message);
+        }
+
+        setHistory((current) =>
+          current.filter((currentSession) => currentSession.sessionId !== sessionId),
+        );
+        setSaveMessage("Sesion eliminada del historial.");
+
+        refreshHistory();
+        refreshProfileAnalytics();
+      } catch (caughtError) {
+        setHistoryError(
+          caughtError instanceof Error ? caughtError.message : "No se pudo eliminar la sesion.",
+        );
+      } finally {
+        setDeletingSessionId(null);
       }
     });
   };
@@ -2030,9 +2084,23 @@ export function TrainingWorkspace({
                                   {sessionSummary.totalSets} sets · {Math.round(sessionSummary.totalLoadKg)} kg · RPE medio {sessionSummary.averageRpe}
                                 </p>
                               </div>
-                              <span className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.18em] ${isConditioningSession(sessionSummary.title) ? "border-orange-400/25 bg-orange-500/10 text-orange-200" : "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"}`}>
-                                {isConditioningSession(sessionSummary.title) ? "condicion" : "fuerza"}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.18em] ${isConditioningSession(sessionSummary.title) ? "border-orange-400/25 bg-orange-500/10 text-orange-200" : "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"}`}>
+                                  {isConditioningSession(sessionSummary.title) ? "condicion" : "fuerza"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => deletePersistedSession(sessionSummary.sessionId)}
+                                  disabled={
+                                    isDeletingSession && deletingSessionId === sessionSummary.sessionId
+                                  }
+                                  className="inline-flex h-8 items-center justify-center rounded-full border border-rose-300/35 bg-rose-500/10 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {isDeletingSession && deletingSessionId === sessionSummary.sessionId
+                                    ? "Eliminando..."
+                                    : "Eliminar"}
+                                </button>
+                              </div>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                               {sessionSummary.topMuscles.map((muscle) => (
@@ -2609,9 +2677,21 @@ export function TrainingWorkspace({
                           <p className="font-semibold text-white">{savedSession.title}</p>
                           <p className="mt-1 text-sm text-white/52">{formatShortDate(savedSession.startedAt)}</p>
                         </div>
-                        <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/58">
-                          {savedSession.totalSets} sets · {Math.round(savedSession.totalLoadKg)} kg
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/58">
+                            {savedSession.totalSets} sets · {Math.round(savedSession.totalLoadKg)} kg
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => deletePersistedSession(savedSession.sessionId)}
+                            disabled={isDeletingSession && deletingSessionId === savedSession.sessionId}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-300/35 bg-rose-500/10 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isDeletingSession && deletingSessionId === savedSession.sessionId
+                              ? "Eliminando..."
+                              : "Eliminar"}
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-4 grid gap-2 text-sm text-white/78 md:grid-cols-2">

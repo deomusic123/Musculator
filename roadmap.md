@@ -1919,3 +1919,46 @@ Solo web:
 
 - Se conserva la lectura analitica real (>100%) y se agrega señal operativa clara de cuanto se excede.
 - No reaparece el desborde hacia la card contigua.
+
+## 55) Feature Perfil - Eliminacion de sesiones desde historial (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: agregar accion de borrado de sesiones en el perfil y en el componente donde ya se administra el historial, con validaciones de pertenencia por usuario+cliente.
+
+### Cambios aplicados
+
+- Backend de borrado:
+    - archivo actualizado: apps/web/src/lib/training/persistence.ts.
+    - nueva funcion: deleteTrainingSession(sessionId, clientId).
+    - validaciones:
+        - requiere cliente seleccionado.
+        - verifica ownership de la sesion por user_id + client_id.
+        - elimina en workout_sessions (con cascada a workout_entries/workout_sets por FK).
+- API route de sesiones:
+    - archivo actualizado: apps/web/src/app/api/training/sessions/route.ts.
+    - nuevo handler DELETE:
+        - recibe sessionId (query) y clientId (query/header).
+        - devuelve error 400 con mensaje claro si falla validacion.
+- UI de perfil y gestion de historial:
+    - archivo actualizado: apps/web/src/components/training/workspace.tsx.
+    - se agrega deletePersistedSession(sessionId) con confirmacion y refresh de historial+analitica.
+    - se agrega boton Eliminar en:
+        - modal de Resumen diario (sesiones por dia del heatmap en Perfil).
+        - tarjetas de Historial real (componente de administracion de sesiones).
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- Perfil (heatmap diario):
+    - al abrir un dia con sesiones, se renderizan botones Eliminar por cada sesion.
+- API DELETE validada:
+    - GET/DELETE con session inexistente devuelve 400 controlado.
+    - payload de error validado: {"error":"La sesion no existe o no pertenece al cliente seleccionado."}.
+
+### Evidencia funcional
+
+- El usuario puede eliminar sesiones desde el perfil sin salir de la vista operativa.
+- La accion mantiene coherencia de datos al refrescar historial y analitica tras la eliminacion.

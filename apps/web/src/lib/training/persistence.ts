@@ -56,6 +56,10 @@ interface ClientOwnershipRow {
   id: string;
 }
 
+interface SessionOwnershipRow {
+  id: string;
+}
+
 interface SessionAnalyticsRow {
   id: string;
   started_at: string;
@@ -761,6 +765,60 @@ export async function listTrainingSessions(
     storage: "supabase",
     sessions,
   });
+}
+
+export async function deleteTrainingSession(sessionId: string, clientId?: string) {
+  const context = await getTrainingPersistenceContext();
+
+  if (!context.configured || !context.userId) {
+    return {
+      status: "preview" as const,
+      storage: "noop" as const,
+      deleted: false,
+    };
+  }
+
+  if (!clientId) {
+    throw new Error("Primero selecciona un cliente para eliminar una sesion.");
+  }
+
+  const admin = createAdminSupabaseClient();
+  const { data: ownedSession, error: ownedSessionError } = (await admin
+    .from("workout_sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", context.userId)
+    .eq("client_id", clientId)
+    .maybeSingle()) as {
+    data: SessionOwnershipRow | null;
+    error: { message: string } | null;
+  };
+
+  if (ownedSessionError) {
+    throw new Error(ownedSessionError.message);
+  }
+
+  if (!ownedSession) {
+    throw new Error("La sesion no existe o no pertenece al cliente seleccionado.");
+  }
+
+  const { error: deleteError } = await admin
+    .from("workout_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("user_id", context.userId)
+    .eq("client_id", clientId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  return {
+    status: "deleted" as const,
+    storage: "supabase" as const,
+    deleted: true,
+    sessionId,
+  };
 }
 
 function createEmptyPatternMap() {
