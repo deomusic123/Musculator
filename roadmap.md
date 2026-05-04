@@ -2166,3 +2166,29 @@ Solo web:
 - Prueba automatizada en browser:
     - dayHeader: domingo, 03 de mayo
     - sessionCountBadge: 3
+
+## 61) Correccion Operativa de Datos - Reubicacion y limpieza de sesiones (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: ajustar manualmente el historial del cliente para que la sesion `Pull Densidad` (22 sets) quede en el dia 2/5 y eliminar dos sesiones duplicadas `Sesion manual`.
+
+### Cambios operativos aplicados (BD)
+
+- Sesion reubicada de fecha:
+    - session_id: `549d4b01-b7b1-44e3-a6dd-fe0554ddc44d`
+    - title: Pull Densidad
+    - started_at / ended_at actualizado a: `2026-05-02T23:15:00+00:00`.
+- Sesiones eliminadas:
+    - `02df7ebb-8878-4997-9153-67e4526d77ba` (Sesion manual)
+    - `f197d4c8-d16f-434a-8afb-865c35329c2a` (Sesion manual)
+
+### Evidencia de verificacion (query directa)
+
+- Resultado final en `workout_sessions` para `client_id=80aeb197-30e7-4787-81b2-fb09aa25bc28`:
+    - `549d4b01-b7b1-44e3-a6dd-fe0554ddc44d` - Pull Densidad - `2026-05-02T23:15:00+00:00`
+    - `ecd6905c-3b4f-4412-b443-f033a7e71620` - Pull densidad - `2026-04-29T03:56:05.245+00:00`
+
+### Resultado funcional esperado
+
+- El dia 2/5 debe mostrar la sesion Pull Densidad (22 sets).
+- El dia 3/5 ya no debe mostrar las dos sesiones manuales eliminadas.
