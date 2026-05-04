@@ -2070,3 +2070,38 @@ Solo web:
 
 - El usuario puede completar historial faltante sin entrar al modo LIVE del mismo dia.
 - El calendario de Lab refleja consistencia real por dia para apoyar auditoria de adherencia.
+
+## 58) Ajuste UX Sesiones - Toast de guardado y limpieza de bloque de ejercicios (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: convertir el mensaje de guardado exitoso en notificacion tipo toast verde temporal y limpiar solo la seccion de carga de ejercicios despues de guardar.
+
+### Cambios aplicados
+
+- Feedback de guardado actualizado:
+    - archivo actualizado: apps/web/src/components/lab/lab-sessions-board.tsx.
+    - statusMessage deja de renderizarse inline en el formulario y pasa a toast flotante verde.
+    - se agrega auto-dismiss de 3.2s para ocultar la notificacion automaticamente.
+- Limpieza puntual del constructor (solo bloque ejercicios):
+    - al guardar exitosamente, se vacia draft.entries.
+    - se limpia la busqueda del picker y se cierra el dropdown de ejercicios.
+    - se preservan los demas campos de sesion (titulo/fecha/recovery/notas).
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- Verificacion en /lab/sessions sobre localhost:3001.
+- Resultado validado:
+    - toast visible inmediatamente tras guardar.
+    - toast oculto automaticamente luego de unos segundos.
+    - bloque de ejercicios queda limpio tras persistir la sesion.
+
+### Evidencia funcional
+
+- Prueba automatizada en browser:
+    - toastVisibleRightAfterSave: true
+    - toastVisibleAfterDelay: false
+    - exerciseSectionCleared: true

@@ -456,6 +456,20 @@ export function LabSessionsBoard({
     }
   }, [rankedExerciseOptions, selectedExerciseSlug]);
 
+  useEffect(() => {
+    if (!statusMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setStatusMessage(null);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [statusMessage]);
+
   const sessionsByDay = useMemo(() => {
     return history.reduce((accumulator, session) => {
       const key = getDateKey(session.startedAt);
@@ -692,6 +706,14 @@ export function LabSessionsBoard({
               ? `Sesion guardada en ${parsed.savedAt ? formatDateTime(parsed.savedAt) : "timestamp valido"}.`
               : "Sesion validada en modo preview (sin persistencia Supabase).",
           );
+
+          updateDraft((current) => ({
+            ...current,
+            entries: [],
+          }));
+          setExerciseSearchQuery("");
+          setIsExercisePickerOpen(false);
+          setHighlightedExerciseIndex(0);
         } catch (caughtError) {
           setError(caughtError instanceof Error ? caughtError.message : "No se pudo guardar la sesion.");
         }
@@ -1208,18 +1230,18 @@ export function LabSessionsBoard({
           </p>
         ) : null}
 
-        {statusMessage ? (
-          <p className="mt-4 rounded-xl border border-emerald-300/35 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
-            {statusMessage}
-          </p>
-        ) : null}
-
         {selectedClient ? (
           <p className="mt-4 text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
             Cliente activo: {selectedClient.fullName}
           </p>
         ) : null}
       </article>
+
+      {statusMessage ? (
+        <div className="pointer-events-none fixed bottom-24 right-4 z-40 max-w-sm rounded-xl border border-emerald-300/45 bg-emerald-100/95 px-4 py-3 text-sm font-medium text-emerald-900 shadow-[0_16px_30px_rgba(20,83,45,0.22)]">
+          {statusMessage}
+        </div>
+      ) : null}
     </section>
   );
 }
