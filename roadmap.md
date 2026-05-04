@@ -2136,3 +2136,33 @@ Solo web:
     - hydrationMessages: []
     - pageErrors: []
     - hasHydrationMismatch: false
+
+## 60) Fix Lab Sesiones - Dia correcto y conteo por sesiones unicas (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: corregir desalineacion de fecha visible en detalle diario y asegurar que el calendario cuente sesiones unicas por `sessionId` por dia.
+
+### Cambios aplicados
+
+- Parseo robusto de clave de fecha (`YYYY-MM-DD`) para label diario:
+    - archivo actualizado: apps/web/src/components/lab/lab-sessions-board.tsx.
+    - `formatDayLabel` deja de usar `new Date(dateKey)` (que desplazaba el dia por zona horaria) y pasa a parse local explicito con `new Date(year, month - 1, day)`.
+- Conteo defensivo por sesiones unicas:
+    - en el agrupado `sessionsByDay`, se evita insertar duplicados cuando se repite el mismo `sessionId`.
+    - el badge diario refleja cantidad de sesiones unicas, no repeticiones del mismo id.
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- Verificacion en /lab/sessions sobre localhost:3001.
+- Al seleccionar la celda `2026-05-03`, el encabezado muestra `domingo, 03 de mayo` (sin corrimiento a 02).
+- Badge diario para `2026-05-03` mantiene conteo correcto de 3 sesiones.
+
+### Evidencia funcional
+
+- Prueba automatizada en browser:
+    - dayHeader: domingo, 03 de mayo
+    - sessionCountBadge: 3

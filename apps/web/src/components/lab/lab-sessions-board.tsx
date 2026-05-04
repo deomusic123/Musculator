@@ -138,8 +138,21 @@ function getDateKey(value: string | Date) {
   ).padStart(2, "0")}`;
 }
 
+function parseDateKey(value: string) {
+  const [yearRaw, monthRaw, dayRaw] = value.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return new Date(value);
+  }
+
+  return new Date(year, month - 1, day);
+}
+
 function formatDayLabel(value: string) {
-  return new Date(value).toLocaleDateString("es-AR", {
+  return parseDateKey(value).toLocaleDateString("es-AR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
@@ -479,8 +492,12 @@ export function LabSessionsBoard({
     return history.reduce((accumulator, session) => {
       const key = getDateKey(session.startedAt);
       const current = accumulator.get(key) ?? [];
-      current.push(session);
-      accumulator.set(key, current);
+
+      if (!current.some((item) => item.sessionId === session.sessionId)) {
+        current.push(session);
+        accumulator.set(key, current);
+      }
+
       return accumulator;
     }, new Map<string, PersistedTrainingSessionSummary[]>());
   }, [history]);
