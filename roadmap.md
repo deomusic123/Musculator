@@ -2105,3 +2105,34 @@ Solo web:
     - toastVisibleRightAfterSave: true
     - toastVisibleAfterDelay: false
     - exerciseSectionCleared: true
+
+## 59) Fix Lab Sesiones - Hidratacion SSR/cliente (2026-05-03)
+
+- Estado: completado.
+- Objetivo ejecutado: eliminar el recoverable error de hidratacion en /lab/sessions por diferencias de texto entre servidor y cliente.
+
+### Cambios aplicados
+
+- Render inicial sincronizado para evitar mismatch:
+    - archivo actualizado: apps/web/src/components/lab/lab-sessions-board.tsx.
+    - se agrega guardia de montaje cliente (`hasMounted`) para que el primer render SSR y el primer render de hidratacion sean identicos.
+    - tras montar en cliente, se renderiza la UI completa de sesiones con fechas y formatos locales.
+- Reversion de intento incompatible en server component:
+    - archivo actualizado: apps/web/src/app/(app-shell)/(lab)/lab/sessions/page.tsx.
+    - se restaura import directo de LabSessionsBoard (sin uso invalido de `ssr: false` en server component).
+
+### Gate tecnico
+
+- npm.cmd run typecheck --workspace @musculator/web en verde.
+
+### Gate funcional (runtime)
+
+- Recarga de /lab/sessions verificada en localhost:3001.
+- Sin mensajes de hydration mismatch en consola ni page errors en runtime.
+
+### Evidencia funcional
+
+- Prueba automatizada en browser:
+    - hydrationMessages: []
+    - pageErrors: []
+    - hasHydrationMismatch: false

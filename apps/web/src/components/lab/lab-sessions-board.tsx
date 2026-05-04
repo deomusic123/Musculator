@@ -329,6 +329,7 @@ export function LabSessionsBoard({
   exerciseCatalog,
   initialStorage,
 }: LabSessionsBoardProps) {
+  const [hasMounted, setHasMounted] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(initialClientId);
   const [history, setHistory] = useState<PersistedTrainingSessionSummary[]>(initialHistory);
   const [storageMode, setStorageMode] = useState<"supabase" | "noop">(initialStorage);
@@ -385,6 +386,10 @@ export function LabSessionsBoard({
     return ranked.slice(0, 80);
   }, [exerciseCatalog, normalizedExerciseQuery, recentExerciseSlugs]);
   const highlightedExercise = rankedExerciseOptions[highlightedExerciseIndex]?.exercise ?? null;
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -726,6 +731,10 @@ export function LabSessionsBoard({
       return new Date(current.getFullYear(), current.getMonth() + delta, 1);
     });
   };
+
+  if (!hasMounted) {
+    return <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]" />;
+  }
 
   return (
     <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
