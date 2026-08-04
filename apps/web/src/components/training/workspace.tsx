@@ -23,7 +23,7 @@ import {
   trainingTemplates,
 } from "@musculator/domain";
 import { useRouter } from "next/navigation";
-import { startTransition, useDeferredValue, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { EmbeddedExerciseCatalog } from "@/components/lab/embedded-exercise-catalog";
 import { useGlobalOverlay } from "@/components/overlays/global-overlay-provider";
 import type { SetupCheck } from "@/lib/platform/setup";
@@ -680,7 +680,7 @@ export function TrainingWorkspace({
   const [catalogQuery, setCatalogQuery] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
-  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [sessionStartedAt] = useState<number | null>(null);
   const [restSeconds, setRestSeconds] = useState(0);
   const [clockNow, setClockNow] = useState(Date.now());
   const [completedSets, setCompletedSets] = useState<Record<string, boolean>>({});
@@ -983,7 +983,7 @@ export function TrainingWorkspace({
     );
   });
 
-  const refreshClients = () => {
+  const refreshClients = useCallback(() => {
     startClientTransition(async () => {
       try {
         const response = await fetch("/api/clients", {
@@ -1020,9 +1020,9 @@ export function TrainingWorkspace({
         );
       }
     });
-  };
+  }, [startClientTransition]);
 
-  const refreshHistory = () => {
+  const refreshHistory = useCallback(() => {
     startHistoryTransition(async () => {
       try {
         setHistoryError(null);
@@ -1058,9 +1058,9 @@ export function TrainingWorkspace({
         );
       }
     });
-  };
+  }, [selectedClientId, startHistoryTransition]);
 
-  const refreshProfileAnalytics = () => {
+  const refreshProfileAnalytics = useCallback(() => {
     startAnalyticsTransition(async () => {
       try {
         if (!selectedClientId) {
@@ -1095,7 +1095,7 @@ export function TrainingWorkspace({
         );
       }
     });
-  };
+  }, [selectedClientId, startAnalyticsTransition]);
 
   const deletePersistedSession = (sessionId: string) => {
     if (!selectedClientId) {
@@ -1163,7 +1163,7 @@ export function TrainingWorkspace({
     if (!bootstrap) {
       refreshClients();
     }
-  }, []);
+  }, [bootstrap, refreshClients]);
 
   useEffect(() => {
     if (selectedClientId) {
@@ -1184,7 +1184,7 @@ export function TrainingWorkspace({
     }
 
     refreshHistory();
-  }, [selectedClientId]);
+  }, [bootstrap, refreshHistory, selectedClientId]);
 
   useEffect(() => {
     if (
@@ -1197,7 +1197,7 @@ export function TrainingWorkspace({
     }
 
     refreshProfileAnalytics();
-  }, [selectedClientId]);
+  }, [bootstrap, refreshProfileAnalytics, selectedClientId]);
 
   useEffect(() => {
     if (mode !== "live") {
