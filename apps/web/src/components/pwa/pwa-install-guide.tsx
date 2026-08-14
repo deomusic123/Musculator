@@ -2,6 +2,20 @@
 
 import { useEffect, useState } from "react";
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+};
+
+declare global {
+  interface Window {
+    __musculatorInstallPromptEvent?: InstallPromptEvent | null;
+  }
+}
+
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -10,6 +24,30 @@ function isRunningStandalone() {
   const byDisplayMode = window.matchMedia("(display-mode: standalone)").matches;
   const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   return byDisplayMode || iosStandalone;
+}
+
+function isIOS() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function getCapturedInstallPrompt() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.__musculatorInstallPromptEvent ?? null;
+}
+
+function clearCapturedInstallPrompt() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.__musculatorInstallPromptEvent = null;
 }
 
 async function openShareSheetForInstall() {
@@ -34,11 +72,44 @@ export function PwaInstallGuide() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installFeedback, setInstallFeedback] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
     setInstallFeedback(null);
+    setInstallPrompt(getCapturedInstallPrompt());
+
+    const onInstallPromptReady = () => {
+      setInstallPrompt(getCapturedInstallPrompt());
+    };
+
+    const onBeforeInstallPrompt = (event: Event) => {
+      const promptEvent = event as InstallPromptEvent;
+      promptEvent.preventDefault();
+      window.__musculatorInstallPromptEvent = promptEvent;
+      setInstallPrompt(promptEvent);
+    };
+
+    const onAppInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+      clearCapturedInstallPrompt();
+      setInstallFeedback(null);
+    };
+
+    window.addEventListener("musculator:install-prompt-ready", onInstallPromptReady as EventListener);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      window.removeEventListener(
+        "musculator:install-prompt-ready",
+        onInstallPromptReady as EventListener,
+      );
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -58,11 +129,38 @@ export function PwaInstallGuide() {
   const runInstallPrompt = async () => {
     setIsInstalling(true);
     try {
-      const openedShareSheet = await openShareSheetForInstall();
+      let promptEvent = installPrompt ?? getCapturedInstallPrompt();
 
-      if (!openedShareSheet) {
-        setInstallFeedback("No se pudo abrir compartir en este navegador.");
+      if (!promptEvent) {
+        await new Promise((resolve) => window.setTimeout(resolve, 220));
+        promptEvent = getCapturedInstallPrompt();
       }
+
+      if (promptEvent) {
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+        clearCapturedInstallPrompt();
+        setInstallPrompt(null);
+
+        if (choice.outcome === "accepted") {
+          setIsInstalled(true);
+          setInstallFeedback(null);
+          return;
+        }
+
+        setInstallFeedback("Instalación cancelada.");
+        return;
+      }
+
+      if (isIOS()) {
+        const openedShareSheet = await openShareSheetForInstall();
+        if (!openedShareSheet) {
+          setInstallFeedback("No se pudo abrir compartir en Safari.");
+        }
+        return;
+      }
+
+      setInstallFeedback("El instalador nativo aún no está disponible.");
     } finally {
       setIsInstalling(false);
     }
