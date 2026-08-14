@@ -4,6 +4,12 @@ import Link from "next/link";
 import { trainingSessionSaveResponseSchema, type TrainingSessionDraft } from "@musculator/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type LiveCompletedSet, useLiveSessionStore } from "@/lib/live/live-session-store";
+import { CoachNotice } from "@/components/notifications/coach-notice";
+import {
+  ensureNotificationPermission,
+  notifyRestFinished,
+  restFinishedCopy,
+} from "@/lib/notifications/local";
 
 interface LiveSessionShellProps {
   sessionId: string;
@@ -85,61 +91,12 @@ function buildPersistedDraftFromLive(
   } satisfies TrainingSessionDraft;
 }
 
-async function ensureNotificationPermission() {
-  if (typeof window === "undefined" || !("Notification" in window)) {
-    return "unsupported" as const;
-  }
-
-  if (Notification.permission === "granted") {
-    return "granted" as const;
-  }
-
-  if (Notification.permission === "denied") {
-    return "denied" as const;
-  }
-
-  const permission = await Notification.requestPermission();
-  return permission;
-}
-
-async function dispatchRestFinishedNotification() {
-  if (typeof window === "undefined" || !("Notification" in window)) {
-    return;
-  }
-
-  if (Notification.permission !== "granted") {
-    return;
-  }
-
-  const title = "Descanso terminado";
-  const options: NotificationOptions = {
-    body: "Volvé al set. La siguiente serie ya está lista.",
-    icon: "/icons/logo-any-192.png",
-    badge: "/icons/logo-any-192.png",
-    tag: "musculator-rest-finished",
-  };
-
-  if ("serviceWorker" in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-
-      if (registration) {
-        await registration.showNotification(title, options);
-        return;
-      }
-    } catch {
-      // Fall back to direct notification below.
-    }
-  }
-
-  new Notification(title, options);
-}
-
 export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
   const [clockNow, setClockNow] = useState(Date.now());
   const [hydrated, setHydrated] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [restNoticeOpen, setRestNoticeOpen] = useState(false);
   const lastRestNotificationRef = useRef<number | null>(null);
   const previousRestSecondsRef = useRef(0);
   const draft = useLiveSessionStore((state) => state.draft);
@@ -306,7 +263,8 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
 
     if (previousRestSeconds > 0 && lastRestNotificationRef.current !== restEndsAtMs) {
       lastRestNotificationRef.current = restEndsAtMs;
-      void dispatchRestFinishedNotification();
+      setRestNoticeOpen(true);
+      void notifyRestFinished(window.location.pathname);
     }
 
     previousRestSecondsRef.current = restSecondsLeft;
@@ -407,7 +365,7 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
                 Saltar descanso
               </button>
             ) : (
-              <p className="mt-3 text-sm text-white/50">Listo para la siguiente serie</p>
+              <p className="mt-3 text-sm text-[#9cf3d3]">🔥 Listo. La siguiente serie es tuya.</p>
             )}
           </div>
           <div className="rounded-[1.4rem] border border-white/10 bg-black/25 px-4 py-4">
@@ -570,6 +528,16 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
           </section>
         )}
       </div>
+      <CoachNotice
+        open={restNoticeOpen && !workoutDone}
+        emoji={restFinishedCopy.emoji}
+        title={restFinishedCopy.title}
+        body={restFinishedCopy.body}
+        cta={restFinishedCopy.cta}
+        accent="mint"
+        onCta={() => setRestNoticeOpen(false)}
+        onDismiss={() => setRestNoticeOpen(false)}
+      />
     </main>
   );
 }

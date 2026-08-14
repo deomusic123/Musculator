@@ -3,6 +3,7 @@ import { Source_Sans_3, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { GlobalOverlayProvider } from "@/components/overlays/global-overlay-provider";
+import { WaterReminder } from "@/components/notifications/water-reminder";
 import { PwaDiagnostics } from "@/components/pwa/pwa-diagnostics";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import "./globals.css";
@@ -62,7 +63,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         </Script>
         <RegisterServiceWorker />
         <PwaDiagnostics />
-        <GlobalOverlayProvider>{children}</GlobalOverlayProvider>
+        <GlobalOverlayProvider>
+          <WaterReminder />
+          {children}
+        </GlobalOverlayProvider>
       </body>
     </html>
   );
