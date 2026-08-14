@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -47,9 +47,8 @@ export function PwaInstallGuide() {
   const [dismissed, setDismissed] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showManualHint, setShowManualHint] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-
-  const deviceFamily = useMemo(() => detectDeviceFamily(), []);
 
   useEffect(() => {
     setHasMounted(true);
@@ -91,6 +90,7 @@ export function PwaInstallGuide() {
 
   const runInstallPrompt = async () => {
     if (!deferredPrompt) {
+      setShowManualHint(true);
       return;
     }
 
@@ -102,10 +102,12 @@ export function PwaInstallGuide() {
       if (choice.outcome === "accepted") {
         setIsInstalled(true);
         setDeferredPrompt(null);
+        setShowManualHint(false);
         return;
       }
 
       setDeferredPrompt(null);
+      setShowManualHint(true);
     } finally {
       setIsInstalling(false);
     }
@@ -115,56 +117,52 @@ export function PwaInstallGuide() {
     return null;
   }
 
-  return (
-    <section className="mb-4 rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,#0d1724_0%,#09111b_100%)] p-4 text-white shadow-[0_16px_48px_rgba(2,6,23,0.24)] sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/55">Instalar app</p>
-          <h2 className="mt-1 text-lg font-semibold text-white sm:text-xl">Usá Musculator como app en tu celular</h2>
-          <p className="mt-2 text-sm leading-6 text-white/72">
-            Al instalarla, abre más rápido, se ve mejor en pantalla completa y queda junto a tus apps.
-          </p>
-        </div>
+  const deviceFamily = detectDeviceFamily();
 
-        <div className="flex shrink-0 items-center gap-2">
-          {deferredPrompt ? (
-            <button
-              type="button"
-              onClick={() => void runInstallPrompt()}
-              disabled={isInstalling}
-              className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#4cb894] px-4 text-sm font-semibold text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isInstalling ? "Abriendo..." : "Instalar ahora"}
-            </button>
-          ) : null}
+  return (
+    <section className="mb-3 rounded-2xl border border-white/10 bg-[#0b1420] px-3 py-2.5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.2)] sm:px-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm text-white/82">Utilizalo como app.</p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void runInstallPrompt()}
+            disabled={isInstalling}
+            className="inline-flex h-9 items-center justify-center rounded-full bg-[#4cb894] px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isInstalling ? "Abriendo..." : "Instalar"}
+          </button>
           <button
             type="button"
             onClick={hideGuide}
-            className="inline-flex min-h-10 items-center justify-center rounded-full border border-white/15 bg-white/8 px-4 text-sm font-medium text-white/85 transition hover:bg-white/12"
+            aria-label="Cerrar guía de instalación"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/8 text-base text-white/80 transition hover:bg-white/12"
           >
-            Cerrar
+            ×
           </button>
         </div>
       </div>
 
-      <div className="mt-4 rounded-[1.1rem] border border-white/10 bg-white/6 p-3.5 text-sm leading-6 text-white/80">
+      {showManualHint ? (
+        <div className="mt-2 rounded-xl border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/75">
         {deviceFamily === "ios" ? (
           <p>
-            iPhone/iPad: abrí esta web en Safari, tocá <strong>Compartir</strong> y luego{" "}
+              iPhone/iPad: en Safari tocá <strong>Compartir</strong> y luego{" "}
             <strong>Agregar a pantalla de inicio</strong>.
           </p>
         ) : deviceFamily === "android" ? (
           <p>
-            Android: abrí el menú del navegador (<strong>⋮</strong>) y elegí{" "}
+              Android: abrí el menú (<strong>⋮</strong>) y elegí{" "}
             <strong>Instalar app</strong> o <strong>Agregar a pantalla principal</strong>.
           </p>
         ) : (
           <p>
-            En navegador: abrí el menú principal y buscá <strong>Instalar app</strong> o{" "}
+              Abrí el menú del navegador y buscá <strong>Instalar app</strong> o{" "}
             <strong>Agregar a pantalla de inicio</strong>.
           </p>
         )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
