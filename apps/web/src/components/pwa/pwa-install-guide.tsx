@@ -22,32 +22,11 @@ function isRunningStandalone() {
   return byDisplayMode || iosStandalone;
 }
 
-function detectDeviceFamily() {
-  if (typeof navigator === "undefined") {
-    return "generic" as const;
-  }
-
-  const userAgent = navigator.userAgent.toLowerCase();
-  const isAppleMobile = /iphone|ipad|ipod/.test(userAgent);
-  const isAndroid = /android/.test(userAgent);
-
-  if (isAppleMobile) {
-    return "ios" as const;
-  }
-
-  if (isAndroid) {
-    return "android" as const;
-  }
-
-  return "generic" as const;
-}
-
 export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [showManualHint, setShowManualHint] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -90,7 +69,6 @@ export function PwaInstallGuide() {
 
   const runInstallPrompt = async () => {
     if (!deferredPrompt) {
-      setShowManualHint(true);
       return;
     }
 
@@ -102,22 +80,18 @@ export function PwaInstallGuide() {
       if (choice.outcome === "accepted") {
         setIsInstalled(true);
         setDeferredPrompt(null);
-        setShowManualHint(false);
         return;
       }
 
       setDeferredPrompt(null);
-      setShowManualHint(true);
     } finally {
       setIsInstalling(false);
     }
   };
 
-  if (!hasMounted || dismissed || isInstalled) {
+  if (!hasMounted || dismissed || isInstalled || !deferredPrompt) {
     return null;
   }
-
-  const deviceFamily = detectDeviceFamily();
 
   return (
     <section className="mb-3 rounded-2xl border border-white/10 bg-[#0b1420] px-3 py-2.5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.2)] sm:px-4">
@@ -142,27 +116,6 @@ export function PwaInstallGuide() {
           </button>
         </div>
       </div>
-
-      {showManualHint ? (
-        <div className="mt-2 rounded-xl border border-white/10 bg-white/6 px-3 py-2 text-xs text-white/75">
-        {deviceFamily === "ios" ? (
-          <p>
-              iPhone/iPad: en Safari tocá <strong>Compartir</strong> y luego{" "}
-            <strong>Agregar a pantalla de inicio</strong>.
-          </p>
-        ) : deviceFamily === "android" ? (
-          <p>
-              Android: abrí el menú (<strong>⋮</strong>) y elegí{" "}
-            <strong>Instalar app</strong> o <strong>Agregar a pantalla principal</strong>.
-          </p>
-        ) : (
-          <p>
-              Abrí el menú del navegador y buscá <strong>Instalar app</strong> o{" "}
-            <strong>Agregar a pantalla de inicio</strong>.
-          </p>
-        )}
-        </div>
-      ) : null}
     </section>
   );
 }

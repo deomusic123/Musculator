@@ -21,6 +21,10 @@ export const metadata: Metadata = {
     "Base platform for precision nutrition, biomechanical training logs and readiness analytics.",
   manifest: "/manifest.webmanifest",
   themeColor: "#0F172A",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
   appleWebApp: {
     capable: true,
     title: "Musculator",
