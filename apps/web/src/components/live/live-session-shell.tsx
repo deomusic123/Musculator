@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { trainingSessionSaveResponseSchema, type TrainingSessionDraft } from "@musculator/contracts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type LiveCompletedSet, useLiveSessionStore } from "@/lib/live/live-session-store";
 
 interface LiveSessionShellProps {
@@ -85,11 +85,63 @@ function buildPersistedDraftFromLive(
   } satisfies TrainingSessionDraft;
 }
 
+async function ensureNotificationPermission() {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return "unsupported" as const;
+  }
+
+  if (Notification.permission === "granted") {
+    return "granted" as const;
+  }
+
+  if (Notification.permission === "denied") {
+    return "denied" as const;
+  }
+
+  const permission = await Notification.requestPermission();
+  return permission;
+}
+
+async function dispatchRestFinishedNotification() {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
+    return;
+  }
+
+  const title = "Descanso terminado";
+  const options: NotificationOptions = {
+    body: "Volvé al set. La siguiente serie ya está lista.",
+    icon: "/icons/logo-any-192.png",
+    badge: "/icons/logo-any-192.png",
+    tag: "musculator-rest-finished",
+  };
+
+  if ("serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+
+      if (registration) {
+        await registration.showNotification(title, options);
+        return;
+      }
+    } catch {
+      // Fall back to direct notification below.
+    }
+  }
+
+  new Notification(title, options);
+}
+
 export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
   const [clockNow, setClockNow] = useState(Date.now());
   const [hydrated, setHydrated] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const lastRestNotificationRef = useRef<number | null>(null);
+  const previousRestSecondsRef = useRef(0);
   const draft = useLiveSessionStore((state) => state.draft);
   const sessionIdInStore = useLiveSessionStore((state) => state.sessionId);
   const clientId = useLiveSessionStore((state) => state.clientId);
@@ -239,6 +291,26 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
     setSaveState("idle");
     setSaveFeedback(null);
   }, [sessionId]);
+
+  useEffect(() => {
+    const previousRestSeconds = previousRestSecondsRef.current;
+
+    if (!restEndsAtMs || restSecondsLeft > 0) {
+      previousRestSecondsRef.current = restSecondsLeft;
+
+      if (!restEndsAtMs) {
+        lastRestNotificationRef.current = null;
+      }
+      return;
+    }
+
+    if (previousRestSeconds > 0 && lastRestNotificationRef.current !== restEndsAtMs) {
+      lastRestNotificationRef.current = restEndsAtMs;
+      void dispatchRestFinishedNotification();
+    }
+
+    previousRestSecondsRef.current = restSecondsLeft;
+  }, [restEndsAtMs, restSecondsLeft]);
 
   if (!hydrated) {
     return (
@@ -431,14 +503,15 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  void ensureNotificationPermission();
                   completeCurrentSet({
                     reps,
                     weightKg: loadKg,
                     rpe,
                     restSeconds: 90,
-                  })
-                }
+                  });
+                }}
                 className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-[1.4rem] bg-[#4cb894] px-5 py-3 text-base font-semibold text-slate-950 transition hover:bg-[#63c7a5]"
               >
                 Check de serie

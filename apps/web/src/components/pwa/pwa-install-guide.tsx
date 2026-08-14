@@ -24,6 +24,7 @@ export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [installFeedback, setInstallFeedback] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export function PwaInstallGuide() {
     const onAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      setInstallFeedback(null);
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -49,8 +51,23 @@ export function PwaInstallGuide() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!installFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setInstallFeedback(null);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [installFeedback]);
+
   const runInstallPrompt = async () => {
     if (!deferredPrompt) {
+      setInstallFeedback("Instalación no disponible todavía en este navegador.");
       return;
     }
 
@@ -66,12 +83,13 @@ export function PwaInstallGuide() {
       }
 
       setDeferredPrompt(null);
+      setInstallFeedback("Instalación cancelada.");
     } finally {
       setIsInstalling(false);
     }
   };
 
-  if (!hasMounted || isInstalled || !deferredPrompt) {
+  if (!hasMounted || isInstalled) {
     return null;
   }
 
@@ -84,12 +102,19 @@ export function PwaInstallGuide() {
             type="button"
             onClick={() => void runInstallPrompt()}
             disabled={isInstalling}
-            className="inline-flex h-9 items-center justify-center rounded-full bg-[#4cb894] px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
+            className={`inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              deferredPrompt
+                ? "bg-[#4cb894] text-slate-950 hover:bg-[#63c7a5]"
+                : "border border-[#4cb894]/45 bg-[#4cb894]/12 text-[#9cf3d3] hover:bg-[#4cb894]/20"
+            }`}
           >
             {isInstalling ? "Abriendo..." : "Instalar"}
           </button>
         </div>
       </div>
+      {installFeedback ? (
+        <p className="mt-2 text-xs text-white/65">{installFeedback}</p>
+      ) : null}
     </section>
   );
 }
