@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { getSupabaseAdminEnv, hasSupabaseAdminEnv } from "../env/server";
 
 interface DevelopmentProfile {
@@ -16,6 +17,32 @@ export interface TrainingPersistenceContext {
 }
 
 let cachedDevelopmentProfile: DevelopmentProfile | null = null;
+const cachedProfilesByEmail = new Map<string, DevelopmentProfile>();
+const deviceCookieName = "musculator-device-id";
+const deviceIdPattern = /^[a-z0-9][a-z0-9-]{11,63}$/;
+
+function buildDeviceEmail(deviceId: string) {
+  return `device-${deviceId}@device.musculator.app`;
+}
+
+function buildDeviceDisplayName(deviceId: string) {
+  return `Device ${deviceId.slice(0, 8)}`;
+}
+
+async function readRequestDeviceId() {
+  try {
+    const cookieStore = await cookies();
+    const candidate = cookieStore.get(deviceCookieName)?.value?.trim().toLowerCase();
+
+    if (!candidate || !deviceIdPattern.test(candidate)) {
+      return null;
+    }
+
+    return candidate;
+  } catch {
+    return null;
+  }
+}
 
 export function createAdminSupabaseClient() {
   const env = getSupabaseAdminEnv();
@@ -38,35 +65,67 @@ async function ensureDevelopmentProfile(): Promise<DevelopmentProfile | null> {
   }
 
   const env = getSupabaseAdminEnv();
-  const admin = createAdminSupabaseClient();
-  const { data: listedUsers, error: listError } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
+  const profile = await ensureProfileByIdentity({
+    email: env.SUPABASE_DEV_EMAIL,
+    displayName: env.SUPABASE_DEV_DISPLAY_NAME,
   });
 
-  if (listError) {
-    throw new Error(listError.message);
+  cachedDevelopmentProfile = profile;
+
+  return cachedDevelopmentProfile;
+}
+
+async function ensureProfileByIdentity(identity: {
+  email: string;
+  displayName: string;
+}): Promise<DevelopmentProfile> {
+  const cached = cachedProfilesByEmail.get(identity.email);
+
+  if (cached) {
+    return cached;
   }
 
-  let user = listedUsers.users.find(
-    (candidate) => candidate.email?.toLowerCase() === env.SUPABASE_DEV_EMAIL.toLowerCase(),
-  );
+  const admin = createAdminSupabaseClient();
+  const listUsersByPage = async () => {
+    const { data: listedUsers, error: listError } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 500,
+    });
+
+    if (listError) {
+      throw new Error(listError.message);
+    }
+
+    return listedUsers.users;
+  };
+
+  const resolveUserByEmail = async () => {
+    const users = await listUsersByPage();
+    return users.find(
+      (candidate) => candidate.email?.toLowerCase() === identity.email.toLowerCase(),
+    );
+  };
+
+  let user = await resolveUserByEmail();
 
   if (!user) {
     const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
-      email: env.SUPABASE_DEV_EMAIL,
+      email: identity.email,
       password: `${randomUUID()}Aa1!`,
       email_confirm: true,
       user_metadata: {
-        display_name: env.SUPABASE_DEV_DISPLAY_NAME,
+        display_name: identity.displayName,
       },
     });
 
-    if (createError) {
+    if (
+      createError &&
+      !createError.message.toLowerCase().includes("already registered")
+    ) {
       throw new Error(createError.message);
     }
 
-    user = createdUser.user ?? undefined;
+    user = createdUser.user ?? (await resolveUserByEmail()) ?? undefined;
   }
 
   if (!user?.id) {
@@ -76,7 +135,7 @@ async function ensureDevelopmentProfile(): Promise<DevelopmentProfile | null> {
   const { error: profileError } = await admin.from("profiles").upsert(
     {
       id: user.id,
-      display_name: env.SUPABASE_DEV_DISPLAY_NAME,
+      display_name: identity.displayName,
     },
     {
       onConflict: "id",
@@ -87,16 +146,44 @@ async function ensureDevelopmentProfile(): Promise<DevelopmentProfile | null> {
     throw new Error(profileError.message);
   }
 
-  cachedDevelopmentProfile = {
+  const profile = {
     userId: user.id,
-    email: user.email ?? env.SUPABASE_DEV_EMAIL,
-    displayName: env.SUPABASE_DEV_DISPLAY_NAME,
+    email: user.email ?? identity.email,
+    displayName: identity.displayName,
   };
 
-  return cachedDevelopmentProfile;
+  cachedProfilesByEmail.set(identity.email, profile);
+
+  return profile;
 }
 
 export async function getTrainingPersistenceContext(): Promise<TrainingPersistenceContext> {
+  if (!hasSupabaseAdminEnv()) {
+    return {
+      configured: false,
+      storage: "noop",
+      profileLabel: "preview",
+    };
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    const deviceId = await readRequestDeviceId();
+
+    if (deviceId) {
+      const scopedProfile = await ensureProfileByIdentity({
+        email: buildDeviceEmail(deviceId),
+        displayName: buildDeviceDisplayName(deviceId),
+      });
+
+      return {
+        configured: true,
+        storage: "supabase",
+        userId: scopedProfile.userId,
+        profileLabel: scopedProfile.displayName,
+      };
+    }
+  }
+
   const profile = await ensureDevelopmentProfile();
 
   if (!profile) {

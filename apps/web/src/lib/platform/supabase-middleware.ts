@@ -17,6 +17,22 @@ export async function updateSession(request: NextRequest) {
   const response = NextResponse.next({
     request,
   });
+  const deviceCookieName = "musculator-device-id";
+  const currentDeviceCookie = request.cookies.get(deviceCookieName)?.value;
+
+  if (!currentDeviceCookie) {
+    const generatedDeviceId = crypto.randomUUID();
+    request.cookies.set(deviceCookieName, generatedDeviceId);
+    response.cookies.set({
+      name: deviceCookieName,
+      value: generatedDeviceId,
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365 * 3,
+    });
+  }
 
   if (!env) {
     return response;
