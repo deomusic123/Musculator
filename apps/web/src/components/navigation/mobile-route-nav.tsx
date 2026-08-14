@@ -63,9 +63,9 @@ export function MobileRouteNav() {
   return (
     <nav
       data-global-mobile-nav="true"
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 rounded-[1.6rem] border border-white/10 bg-[#08111a]/96 p-2 text-white shadow-[0_20px_50px_rgba(2,6,23,0.42)] backdrop-blur xl:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#08111a]/98 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-14px_36px_rgba(2,6,23,0.35)] backdrop-blur xl:hidden"
     >
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-2">
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-0.5">
         {mobileDestinations.map((item) => {
           const active = isNavItemActive(pathname, surface, item);
 
@@ -75,10 +75,10 @@ export function MobileRouteNav() {
                 key={item.id}
                 type="button"
                 onClick={() => handleSurfaceNav(item)}
-                className={`flex min-h-14 flex-col items-center justify-center rounded-[1.15rem] px-2 py-2 text-center transition ${
+                className={`flex min-h-14 flex-col items-center justify-center rounded-lg border-t-2 px-2 py-2 text-center transition ${
                   active
-                    ? "bg-[#4cb894] text-slate-950"
-                    : "bg-white/6 text-white/72 hover:bg-white/10 hover:text-white"
+                    ? "border-[#4cb894] bg-white/8 text-white"
+                    : "border-transparent bg-transparent text-white/72 hover:bg-white/6 hover:text-white"
                 }`}
               >
                 <span className="text-[10px] uppercase tracking-[0.22em] opacity-70">{item.eyebrow}</span>
@@ -92,10 +92,10 @@ export function MobileRouteNav() {
               key={item.id}
               href={item.href}
               prefetch
-              className={`flex min-h-14 flex-col items-center justify-center rounded-[1.15rem] px-2 py-2 text-center transition ${
+              className={`flex min-h-14 flex-col items-center justify-center rounded-lg border-t-2 px-2 py-2 text-center transition ${
                 active
-                  ? "bg-[#4cb894] text-slate-950"
-                  : "bg-white/6 text-white/72 hover:bg-white/10 hover:text-white"
+                  ? "border-[#4cb894] bg-white/8 text-white"
+                  : "border-transparent bg-transparent text-white/72 hover:bg-white/6 hover:text-white"
               }`}
             >
               <span className="text-[10px] uppercase tracking-[0.22em] opacity-70">{item.eyebrow}</span>
@@ -107,7 +107,7 @@ export function MobileRouteNav() {
         <button
           type="button"
           onClick={handleTrainNav}
-          className="flex min-h-14 min-w-14 items-center justify-center rounded-[1.15rem] bg-[#4cb894] px-4 text-sm font-semibold text-slate-950 transition hover:bg-[#63c7a5]"
+          className="flex min-h-14 min-w-14 items-center justify-center rounded-lg border-t-2 border-[#4cb894] bg-[#4cb894]/15 px-4 text-sm font-semibold text-[#9cf3d3] transition hover:bg-[#4cb894]/25"
         >
           {NAV_LABELS.train}
         </button>

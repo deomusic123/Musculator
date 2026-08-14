@@ -10,8 +10,6 @@ type BeforeInstallPromptEvent = Event & {
   }>;
 };
 
-const dismissedStorageKey = "musculator:pwa-install-guide-dismissed";
-
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -24,7 +22,6 @@ function isRunningStandalone() {
 
 export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -32,12 +29,6 @@ export function PwaInstallGuide() {
   useEffect(() => {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
-
-    try {
-      setDismissed(window.localStorage.getItem(dismissedStorageKey) === "1");
-    } catch {
-      setDismissed(false);
-    }
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -57,15 +48,6 @@ export function PwaInstallGuide() {
       window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
-
-  const hideGuide = () => {
-    setDismissed(true);
-    try {
-      window.localStorage.setItem(dismissedStorageKey, "1");
-    } catch {
-      // Ignore storage failures; we still hide for current render.
-    }
-  };
 
   const runInstallPrompt = async () => {
     if (!deferredPrompt) {
@@ -89,7 +71,7 @@ export function PwaInstallGuide() {
     }
   };
 
-  if (!hasMounted || dismissed || isInstalled || !deferredPrompt) {
+  if (!hasMounted || isInstalled || !deferredPrompt) {
     return null;
   }
 
@@ -105,14 +87,6 @@ export function PwaInstallGuide() {
             className="inline-flex h-9 items-center justify-center rounded-full bg-[#4cb894] px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isInstalling ? "Abriendo..." : "Instalar"}
-          </button>
-          <button
-            type="button"
-            onClick={hideGuide}
-            aria-label="Cerrar guía de instalación"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/8 text-base text-white/80 transition hover:bg-white/12"
-          >
-            ×
           </button>
         </div>
       </div>

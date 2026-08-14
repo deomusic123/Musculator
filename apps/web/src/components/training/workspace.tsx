@@ -2451,7 +2451,7 @@ export function TrainingWorkspace({
       ) : null}
 
       {mode === "dashboard" ? (
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-0 flex-col bg-[#08111a] md:bg-transparent">
           <section className="border-b border-white/8 bg-[#08111a] px-4 py-4 md:hidden">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.22em] text-white/42">Musculator</p>
@@ -2461,11 +2461,11 @@ export function TrainingWorkspace({
             </div>
           </section>
 
-          <div className="flex-1 px-3 pb-4 pt-3 sm:px-0 sm:pb-0 sm:pt-6">
-          <div className="grid min-w-0 gap-6">
+          <div className="flex-1 px-0 pb-0 pt-0 sm:px-0 sm:pb-0 sm:pt-6">
+          <div className="grid min-w-0 gap-3 sm:gap-6">
 
           {dashboardSurface === "profile" ? (
-            <div className="grid min-w-0 gap-6">
+            <div className="grid min-w-0 gap-3 sm:gap-6">
               {(saveMessage || historyError) && (
                 <div
                   className={`rounded-[1.5rem] border px-4 py-3 text-sm ${

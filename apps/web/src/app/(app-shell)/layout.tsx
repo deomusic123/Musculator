@@ -6,8 +6,8 @@ import { PwaInstallGuide } from "@/components/pwa/pwa-install-guide";
 
 export default function AppShellLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-[100svh] overflow-x-hidden px-0 py-0 sm:px-4 sm:py-4 lg:px-8 lg:py-8">
-      <div className="mx-auto flex min-h-[100svh] max-w-7xl gap-6">
+    <main className="min-h-[100svh] overflow-x-hidden bg-[#08111a] xl:bg-transparent">
+      <div className="mx-auto flex min-h-[100svh] w-full max-w-none gap-0">
         <Suspense fallback={null}>
           <AppNav />
         </Suspense>

@@ -58,9 +58,9 @@ export function AppNav() {
   return (
     <aside
       data-global-sidebar="true"
-      className="hidden w-72 shrink-0 flex-col rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_20px_60px_rgba(20,33,43,0.06)] xl:flex"
+      className="hidden w-72 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] px-4 py-5 xl:flex"
     >
-      <div className="flex items-center gap-3 rounded-[1.5rem] bg-slate-950 px-4 py-4 text-white">
+      <div className="flex items-center gap-3 rounded-[1rem] bg-slate-950 px-4 py-3.5 text-white">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold">
           MU
         </div>
@@ -80,10 +80,10 @@ export function AppNav() {
                 key={item.id}
                 type="button"
                 onClick={() => handleSurfaceNav(item)}
-                className={`rounded-[1.3rem] px-4 py-3 text-left transition ${
+                className={`rounded-[1rem] px-4 py-3 text-left transition ${
                   active
                     ? "bg-[#0d1724] text-white"
-                    : "bg-white/70 text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"
+                    : "bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
                 }`}
               >
                 <p className="text-sm font-medium">{item.label}</p>
@@ -99,10 +99,10 @@ export function AppNav() {
               key={item.id}
               href={item.href}
               prefetch
-              className={`rounded-[1.3rem] px-4 py-3 transition ${
+              className={`rounded-[1rem] px-4 py-3 transition ${
                 active
                   ? "bg-[#0d1724] text-white"
-                  : "bg-white/70 text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"
+                  : "bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
               }`}
             >
               <p className="text-sm font-medium">{item.label}</p>
@@ -123,10 +123,10 @@ export function AppNav() {
               key={item.id}
               type="button"
               onClick={() => handleSurfaceNav(item)}
-              className={`rounded-[1.1rem] px-4 py-2.5 text-left text-sm transition ${
+              className={`rounded-[0.9rem] px-4 py-2.5 text-left text-sm transition ${
                 active
                   ? "bg-[#0d1724] text-white"
-                  : "bg-white/70 text-[var(--muted)] hover:bg-white hover:text-[var(--ink)]"
+                  : "bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]"
               }`}
             >
               {item.label}
@@ -137,7 +137,7 @@ export function AppNav() {
         <button
           type="button"
           onClick={handleTrain}
-          className="rounded-[1.3rem] bg-[#4cb894] px-4 py-3 text-left transition hover:bg-[#63c7a5]"
+          className="rounded-[1rem] bg-[#4cb894] px-4 py-3 text-left transition hover:bg-[#63c7a5]"
         >
           <p className="text-sm font-semibold text-slate-950">{NAV_LABELS.train}</p>
           <p className="mt-1 text-xs text-slate-950/70">Abrir check-in de sesión</p>
