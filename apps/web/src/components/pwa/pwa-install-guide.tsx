@@ -26,14 +26,6 @@ function isRunningStandalone() {
   return byDisplayMode || iosStandalone;
 }
 
-function isIOS() {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
 function getCapturedInstallPrompt() {
   if (typeof window === "undefined") {
     return null;
@@ -48,23 +40,6 @@ function clearCapturedInstallPrompt() {
   }
 
   window.__musculatorInstallPromptEvent = null;
-}
-
-async function openShareSheetForInstall() {
-  if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.share) {
-    return false;
-  }
-
-  try {
-    await navigator.share({
-      title: "Musculator",
-      text: "Instalá Musculator como app.",
-      url: window.location.href,
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function PwaInstallGuide() {
@@ -152,15 +127,7 @@ export function PwaInstallGuide() {
         return;
       }
 
-      if (isIOS()) {
-        const openedShareSheet = await openShareSheetForInstall();
-        if (!openedShareSheet) {
-          setInstallFeedback("No se pudo abrir compartir en Safari.");
-        }
-        return;
-      }
-
-      setInstallFeedback("El instalador nativo aún no está disponible.");
+      setInstallFeedback("Este navegador no habilita instalación directa con un toque.");
     } finally {
       setIsInstalling(false);
     }
