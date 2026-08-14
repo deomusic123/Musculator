@@ -16,6 +16,8 @@ declare global {
   }
 }
 
+const installReadyEventName = "musculator:install-ready";
+
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -35,6 +37,23 @@ function isIOSBrowser() {
   return /iphone|ipad|ipod/.test(ua);
 }
 
+async function openShareSheet() {
+  if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.share) {
+    return false;
+  }
+
+  try {
+    await navigator.share({
+      title: "Musculator",
+      text: "Instalá Musculator como app.",
+      url: window.location.href,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -47,10 +66,16 @@ export function PwaInstallGuide() {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
     setDismissed(false);
+    setInstallPrompt(window.__musculatorInstallPromptEvent ?? null);
+
+    const onInstallReady = () => {
+      setInstallPrompt(window.__musculatorInstallPromptEvent ?? null);
+    };
 
     const onBeforeInstallPrompt = (event: Event) => {
       const promptEvent = event as InstallPromptEvent;
       promptEvent.preventDefault();
+      window.__musculatorInstallPromptEvent = promptEvent;
       setInstallPrompt(promptEvent);
     };
 
@@ -59,12 +84,15 @@ export function PwaInstallGuide() {
       setDismissed(true);
       setInstallPrompt(null);
       setInstallFeedback(null);
+      window.__musculatorInstallPromptEvent = null;
     };
 
+    window.addEventListener(installReadyEventName, onInstallReady as EventListener);
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
+      window.removeEventListener(installReadyEventName, onInstallReady as EventListener);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
@@ -85,29 +113,38 @@ export function PwaInstallGuide() {
   }, [installFeedback]);
 
   const runInstallPrompt = async () => {
-    if (!installPrompt) {
-      setInstallFeedback(
-        isIOSBrowser()
-          ? "iOS no permite instalación directa por botón en web. Usá Safari > Compartir > Añadir a inicio."
-          : "Instalador aún no disponible. Probá recargar y volver a tocar Instalar.",
-      );
-      return;
-    }
-
     setIsInstalling(true);
     try {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      setInstallPrompt(null);
+      const activePrompt = installPrompt ?? window.__musculatorInstallPromptEvent ?? null;
 
-      if (choice.outcome === "accepted") {
-        setIsInstalled(true);
-        setDismissed(true);
-        setInstallFeedback(null);
+      if (activePrompt) {
+        await activePrompt.prompt();
+        const choice = await activePrompt.userChoice;
+        window.__musculatorInstallPromptEvent = null;
+        setInstallPrompt(null);
+
+        if (choice.outcome === "accepted") {
+          setIsInstalled(true);
+          setDismissed(true);
+          setInstallFeedback(null);
+          return;
+        }
+
+        setInstallFeedback("Instalación cancelada.");
         return;
       }
 
-      setInstallFeedback("Instalación cancelada.");
+      if (isIOSBrowser()) {
+        const opened = await openShareSheet();
+        setInstallFeedback(
+          opened
+            ? "En compartir, elegí “Añadir a pantalla de inicio”."
+            : "Abrí Safari > Compartir > Añadir a pantalla de inicio.",
+        );
+        return;
+      }
+
+      setInstallFeedback("Instalador no disponible todavía. Recargá y tocá Instalar de nuevo.");
     } finally {
       setIsInstalling(false);
     }

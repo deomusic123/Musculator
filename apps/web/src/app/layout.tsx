@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Sans_3, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import type { ReactNode } from "react";
 import { GlobalOverlayProvider } from "@/components/overlays/global-overlay-provider";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
@@ -39,6 +40,18 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="es" className={`${headingFont.variable} ${bodyFont.variable}`}>
       <body>
+        <Script id="musculator-install-capture" strategy="beforeInteractive">
+          {`(() => {
+  if (typeof window === "undefined") return;
+  const eventName = "musculator:install-ready";
+  window.__musculatorInstallPromptEvent = window.__musculatorInstallPromptEvent ?? null;
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    window.__musculatorInstallPromptEvent = event;
+    window.dispatchEvent(new Event(eventName));
+  });
+})();`}
+        </Script>
         <RegisterServiceWorker />
         <GlobalOverlayProvider>{children}</GlobalOverlayProvider>
       </body>
