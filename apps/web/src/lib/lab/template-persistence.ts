@@ -569,10 +569,10 @@ export async function updateLabTemplate(
 
   const { data: existingTemplate, error: existingError } = (await admin
     .from("training_templates")
-    .select("id, owner_user_id")
+    .select("id, owner_user_id, is_system")
     .eq("id", templateId)
     .maybeSingle()) as {
-    data: Pick<TemplateRow, "id" | "owner_user_id"> | null;
+    data: Pick<TemplateRow, "id" | "owner_user_id" | "is_system"> | null;
     error: { message: string } | null;
   };
 
@@ -585,6 +585,11 @@ export async function updateLabTemplate(
   }
 
   if (existingTemplate.owner_user_id !== context.userId) {
+    if (existingTemplate.is_system) {
+      // System templates are read-only; persist user edits as a personal copy.
+      return createLabTemplate(parsed);
+    }
+
     throw new Error("No se puede editar un template fuera de alcance del usuario actual.");
   }
 

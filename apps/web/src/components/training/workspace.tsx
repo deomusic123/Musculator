@@ -126,20 +126,25 @@ type MuscleMapWidgetCtor = new (
   },
 ) => MuscleMapWidgetInstance;
 
-let muscleMapWidgetCtorPromise: Promise<MuscleMapWidgetCtor> | null = null;
+type AthleteSex = "male" | "female";
+
+type MuscleMapModule = {
+  MuscleMapWidget: MuscleMapWidgetCtor;
+  ALL_MUSCLES?: string[];
+};
+
+let muscleMapModulePromise: Promise<MuscleMapModule> | null = null;
 const loadExternalModule = new Function(
   "path",
   "return import(path);",
-) as (path: string) => Promise<{ MuscleMapWidget: MuscleMapWidgetCtor }>;
+) as (path: string) => Promise<MuscleMapModule>;
 
-function loadMuscleMapWidgetCtor() {
-  if (!muscleMapWidgetCtorPromise) {
-    muscleMapWidgetCtorPromise = loadExternalModule("/vendors/musclemapjs/index.js").then(
-      (module) => module.MuscleMapWidget as MuscleMapWidgetCtor,
-    );
+function loadMuscleMapModule() {
+  if (!muscleMapModulePromise) {
+    muscleMapModulePromise = loadExternalModule("/vendors/musclemapjs/index.js");
   }
 
-  return muscleMapWidgetCtorPromise;
+  return muscleMapModulePromise;
 }
 
 const muscleMapTargets: Record<string, string[]> = {
@@ -155,6 +160,12 @@ const muscleMapTargets: Record<string, string[]> = {
   dorsal: ["upper-back", "rhomboids"],
   gluteo: ["gluteal"],
   femoral: ["hamstring"],
+};
+
+const anatomyHeatmapConfig = {
+  colorScale: "workout" as const,
+  gradientFill: true,
+  gradientDirection: "topToBottom" as const,
 };
 
 function toneToIntensity(tone: keyof typeof muscleTone) {
@@ -197,6 +208,55 @@ function extractOptionalMetricFromNotes(notes: string | undefined, pattern: RegE
   const normalized = Number(match[1].replace(",", "."));
 
   return Number.isFinite(normalized) ? normalized : null;
+}
+
+function parsePositiveInputMetric(raw: string) {
+  const normalized = raw.replace(",", ".").trim();
+
+  if (!normalized) {
+    return Number.NaN;
+  }
+
+  const parsed = Number(normalized);
+
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function resolvePinnedClientId(clients: ClientProfile[], currentClientId: string | null) {
+  const pinnedClient = clients.find((client) => /\btadeo?\b/i.test(client.fullName.trim()));
+
+  if (pinnedClient) {
+    return pinnedClient.id;
+  }
+
+  if (currentClientId && clients.some((client) => client.id === currentClientId)) {
+    return currentClientId;
+  }
+
+  return clients[0]?.id ?? null;
+}
+
+async function parseResponseBody(response: Response) {
+  const bodyText = await response.text();
+
+  if (!bodyText) {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
+
+  try {
+    return {
+      raw: JSON.parse(bodyText) as unknown,
+      bodyText,
+    };
+  } catch {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
 }
 
 function buildConsistencyHeatmap(history: PersistedTrainingSessionSummary[]) {
@@ -543,6 +603,8 @@ function AnatomyHeatmap({
   const backRef = useRef<HTMLDivElement | null>(null);
   const frontWidgetRef = useRef<MuscleMapWidgetInstance | null>(null);
   const backWidgetRef = useRef<MuscleMapWidgetInstance | null>(null);
+  const latestHeatmapDataRef = useRef<Array<{ muscle: never; intensity: number }>>([]);
+  const [supportedMuscles, setSupportedMuscles] = useState<Set<string> | null>(null);
   const heatmapData = useMemo(() => {
     const intensities = new Map<string, number>();
 
@@ -551,16 +613,25 @@ function AnatomyHeatmap({
       const intensity = toneToIntensity(muscle.tone);
 
       for (const target of mapped) {
+        if (supportedMuscles && !supportedMuscles.has(target)) {
+          continue;
+        }
         const current = intensities.get(target) ?? 0;
         intensities.set(target, Math.max(current, intensity));
       }
     }
 
-    return Array.from(intensities.entries()).map(([muscle, intensity]) => ({
-      muscle: muscle as never,
+    return Array.from(intensities.entries()).map(([targetMuscle, intensity]) => ({
+      muscle: targetMuscle as never,
       intensity,
     }));
-  }, [muscles]);
+  }, [muscles, supportedMuscles]);
+
+  useEffect(() => {
+    latestHeatmapDataRef.current = heatmapData;
+    frontWidgetRef.current?.setHeatmap(heatmapData, anatomyHeatmapConfig);
+    backWidgetRef.current?.setHeatmap(heatmapData, anatomyHeatmapConfig);
+  }, [heatmapData]);
 
   useEffect(() => {
     if (!frontRef.current || !backRef.current) {
@@ -570,12 +641,17 @@ function AnatomyHeatmap({
     let cancelled = false;
 
     const mountMaps = async () => {
-      const MuscleMapWidget = await loadMuscleMapWidgetCtor();
+      const module = await loadMuscleMapModule();
 
       if (cancelled || !frontRef.current || !backRef.current) {
         return;
       }
 
+      if (module.ALL_MUSCLES && module.ALL_MUSCLES.length > 0) {
+        setSupportedMuscles(new Set(module.ALL_MUSCLES));
+      }
+
+      const MuscleMapWidget = module.MuscleMapWidget;
       frontWidgetRef.current?.destroy();
       backWidgetRef.current?.destroy();
 
@@ -594,6 +670,10 @@ function AnatomyHeatmap({
         interactive: false,
         multiSelect: false,
       });
+
+      const currentHeatmapData = latestHeatmapDataRef.current;
+      frontWidgetRef.current.setHeatmap(currentHeatmapData, anatomyHeatmapConfig);
+      backWidgetRef.current.setHeatmap(currentHeatmapData, anatomyHeatmapConfig);
     };
 
     void mountMaps();
@@ -606,17 +686,6 @@ function AnatomyHeatmap({
       backWidgetRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    const config = {
-      colorScale: "workout" as const,
-      gradientFill: true,
-      gradientDirection: "topToBottom" as const,
-    };
-
-    frontWidgetRef.current?.setHeatmap(heatmapData, config);
-    backWidgetRef.current?.setHeatmap(heatmapData, config);
-  }, [heatmapData]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -868,10 +937,27 @@ export function TrainingWorkspace({
   const [isLaunchingLive, setIsLaunchingLive] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(trainingTemplates[0]?.id ?? "pull-density");
   const startLiveSession = useLiveSessionStore((state) => state.startLiveSession);
+  const [showAthleteOnboarding, setShowAthleteOnboarding] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [isResolvingClients, setIsResolvingClients] = useState(false);
+  const [hasResolvedInitialClients, setHasResolvedInitialClients] = useState(Boolean(bootstrap));
   const [clientForm, setClientForm] = useState({
     fullName: "",
     goal: "",
     notes: "",
+  });
+  const [athleteOnboardingForm, setAthleteOnboardingForm] = useState<{
+    fullName: string;
+    sex: AthleteSex;
+    ageYears: string;
+    weightKg: string;
+    heightCm: string;
+  }>({
+    fullName: "",
+    sex: "male",
+    ageYears: "",
+    weightKg: "",
+    heightCm: "",
   });
   const [activeCategory, setActiveCategory] = useState(catalogCategories[0] ?? "Espalda");
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -920,40 +1006,89 @@ export function TrainingWorkspace({
     () => heatmapDays.slice(-7).filter((day) => day.sessions.length > 0).length,
     [heatmapDays],
   );
+  const hasSessionHistory = history.length > 0;
+  const hasAnalyticsSignals = useMemo(() => {
+    if (!profileAnalytics) {
+      return false;
+    }
+
+    if (
+      profileAnalytics.weeklyNeuralCost > 0 ||
+      profileAnalytics.recoveryGapHours > 0 ||
+      profileAnalytics.nutritionRecoveryGap > 0
+    ) {
+      return true;
+    }
+
+    return profileAnalytics.stimulusBalance.some(
+      (slice) => slice.actualSets > 0 || slice.actualLoadKg > 0,
+    );
+  }, [profileAnalytics]);
+  const hasProfileInsights = hasSessionHistory || hasAnalyticsSignals;
   const fallbackBiomechanicalAxes = useMemo(() => inferBiomechanicalAxes(history), [history]);
   const biomechanicalAxes = profileAnalytics?.radarAxes ?? fallbackBiomechanicalAxes;
   const weakestBiomechanicalAxis = useMemo(
     () => [...biomechanicalAxes].sort((left, right) => left.actualPercent - right.actualPercent)[0],
     [biomechanicalAxes],
   );
-  const profileReadiness = profileAnalytics?.readiness ?? analysis.readiness;
-  const weeklyNeuralCost = profileAnalytics?.weeklyNeuralCost ?? Number((analysis.summary.totalSets * 7.4).toFixed(1));
-  const weeklyNeuralTarget = profileAnalytics?.weeklyNeuralTarget ?? weeklyNeuralCost;
+  const profileReadiness =
+    profileAnalytics?.readiness ??
+    (hasSessionHistory
+      ? analysis.readiness
+      : {
+          score: 0,
+          status: "amber" as const,
+          localPenalty: 0,
+          centralPenalty: 0,
+          recoveryBonus: 0,
+        });
+  const weeklyNeuralCost =
+    profileAnalytics?.weeklyNeuralCost ??
+    (hasSessionHistory ? Number((analysis.summary.totalSets * 7.4).toFixed(1)) : 0);
+  const weeklyNeuralTarget = profileAnalytics?.weeklyNeuralTarget ?? (hasSessionHistory ? weeklyNeuralCost : 0);
   const weeklyNeuralDelta = profileAnalytics?.weeklyNeuralDelta ?? 0;
-  const weeklyNeuralProgressPercent = Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100);
-  const weeklyNeuralProgressBarPercent = clamp(weeklyNeuralProgressPercent, 10, 100);
+  const weeklyNeuralProgressPercent = hasProfileInsights
+    ? Math.round((weeklyNeuralCost / Math.max(weeklyNeuralTarget, 1)) * 100)
+    : 0;
+  const weeklyNeuralProgressBarPercent = hasProfileInsights
+    ? clamp(weeklyNeuralProgressPercent, 10, 100)
+    : 0;
   const weeklyNeuralOverflowPercent = Math.max(weeklyNeuralProgressPercent - 100, 0);
   const recoveryGapHours = profileAnalytics?.recoveryGapHours ?? 0;
   const nutritionRecoveryGap = profileAnalytics?.nutritionRecoveryGap ?? 0;
   const nutritionSupportRatio =
     profileAnalytics?.nutritionSupportRatio ??
-    Number(((session.recoveryInputs.carbsTargetRatio + session.recoveryInputs.hydrationTargetRatio) / 2).toFixed(2));
+    (hasSessionHistory
+      ? Number(((session.recoveryInputs.carbsTargetRatio + session.recoveryInputs.hydrationTargetRatio) / 2).toFixed(2))
+      : 0);
   const targetSupportRatio = profileAnalytics?.targetSupportRatio ?? 1;
   const profileStimulusBalance = useMemo(
-    () =>
-      profileAnalytics?.stimulusBalance.map((slice) => ({
-        stimulusVector: slice.stimulusVector,
-        totalSets: slice.actualSets,
-        totalLoadKg: slice.actualLoadKg,
-        targetSets: slice.targetSets,
-      })) ??
-      analysis.stimulusBalance.map((slice) => ({
+    () => {
+      if (profileAnalytics) {
+        if (!hasProfileInsights) {
+          return [];
+        }
+
+        return profileAnalytics.stimulusBalance.map((slice) => ({
+          stimulusVector: slice.stimulusVector,
+          totalSets: slice.actualSets,
+          totalLoadKg: slice.actualLoadKg,
+          targetSets: slice.targetSets,
+        }));
+      }
+
+      if (!hasSessionHistory) {
+        return [];
+      }
+
+      return analysis.stimulusBalance.map((slice) => ({
         stimulusVector: slice.stimulusVector,
         totalSets: slice.totalSets,
         totalLoadKg: slice.totalLoadKg,
         targetSets: slice.totalSets,
-      })),
-    [analysis.stimulusBalance, profileAnalytics],
+      }));
+    },
+    [analysis.stimulusBalance, hasProfileInsights, hasSessionHistory, profileAnalytics],
   );
   const referencePlanLabel =
     profileAnalytics?.referenceProtocolName ??
@@ -1035,18 +1170,104 @@ export function TrainingWorkspace({
       .filter((item) => new Date(item.startedAt) >= weeklyWindowStart)
       .reduce((sum, item) => sum + item.totalLoadKg, 0);
   }, [history]);
-  const recoveryCatalog = useMemo(
+  const muscleMetadataBySlug = useMemo(
     () =>
-      [...analysis.muscleLoad].sort(
-        (left, right) =>
-          right.recoveryTimeHours - left.recoveryTimeHours || right.totalSets - left.totalSets,
+      analysis.muscleLoad.reduce(
+        (accumulator, muscle) => {
+          accumulator.set(muscle.muscle, {
+            label: muscle.label,
+            category: muscle.category,
+            recoveryTimeHours: muscle.recoveryTimeHours,
+          });
+
+          return accumulator;
+        },
+        new Map<string, { label: string; category: string; recoveryTimeHours: number }>(),
       ),
     [analysis.muscleLoad],
   );
+  const historyMuscleLoad = useMemo(() => {
+    const aggregate = history.reduce(
+      (accumulator, sessionSummary) => {
+        for (const muscle of sessionSummary.topMuscles) {
+          const current = accumulator.get(muscle.muscleSlug) ?? {
+            muscle: muscle.muscleSlug,
+            label: muscle.muscleName,
+            category: "Histórico",
+            totalSets: 0,
+            totalLoadKg: 0,
+            recoveryTimeHours: 48,
+            averageRpe: 0,
+            tone: "low" as keyof typeof muscleTone,
+          };
+          const metadata = muscleMetadataBySlug.get(muscle.muscleSlug);
+
+          current.label = metadata?.label ?? current.label;
+          current.category = metadata?.category ?? current.category;
+          current.recoveryTimeHours = metadata?.recoveryTimeHours ?? current.recoveryTimeHours;
+          current.totalSets += muscle.totalSets;
+          current.totalLoadKg += muscle.totalLoadKg;
+          accumulator.set(muscle.muscleSlug, current);
+        }
+
+        return accumulator;
+      },
+      new Map<
+        string,
+        {
+          muscle: string;
+          label: string;
+          category: string;
+          totalSets: number;
+          totalLoadKg: number;
+          recoveryTimeHours: number;
+          averageRpe: number;
+          tone: keyof typeof muscleTone;
+        }
+      >(),
+    );
+
+    return [...aggregate.values()]
+      .map((item) => ({
+        ...item,
+        tone: (item.totalSets >= 12 ? "high" : item.totalSets >= 6 ? "moderate" : "low") as
+          | "low"
+          | "moderate"
+          | "high",
+      }))
+      .sort(
+        (left, right) =>
+          right.totalSets - left.totalSets || right.totalLoadKg - left.totalLoadKg,
+      );
+  }, [history, muscleMetadataBySlug]);
+  const recoveryCatalog = useMemo(
+    () => {
+      if (!hasSessionHistory) {
+        return [];
+      }
+
+      return [...historyMuscleLoad].sort(
+        (left, right) =>
+          right.recoveryTimeHours - left.recoveryTimeHours || right.totalSets - left.totalSets,
+      );
+    },
+    [hasSessionHistory, historyMuscleLoad],
+  );
   const priorityRecoveryMuscles = useMemo(() => recoveryCatalog.slice(0, 5), [recoveryCatalog]);
-  const nextActionSuggestion = analysis.recommendations[0]
-    ? analysis.recommendations[0]
-    : "Todavía no hay una sugerencia prioritaria calculada para este bloque.";
+  const nextActionSuggestion = hasProfileInsights
+    ? weakestBiomechanicalAxis
+      ? `Reforzá ${weakestBiomechanicalAxis.label.toLowerCase()} en el próximo bloque para equilibrar el estímulo del atleta.`
+      : "Todavía no hay una sugerencia prioritaria calculada para este bloque."
+    : "Sin historial todavía. Guardá la primera sesión para generar recomendaciones reales del atleta.";
+  const readinessLabel = hasProfileInsights ? readinessPalette[profileReadiness.status].label : "Sin datos todavía";
+  const readinessToneClass = hasProfileInsights
+    ? readinessTone[profileReadiness.status]
+    : "border-slate-400/20 bg-slate-500/10 text-slate-200";
+  const readinessRingColor = hasProfileInsights ? readinessPalette[profileReadiness.status].solid : "#64748b";
+  const readinessRingSoft = hasProfileInsights
+    ? readinessPalette[profileReadiness.status].soft
+    : "rgba(100,116,139,0.18)";
+  const showCriticalAlert = hasProfileInsights && profileReadiness.status === "red";
   const athleteTitle = selectedClient?.fullName ?? "Perfil del atleta";
   const selectDashboardSurface = useCallback((surface: DashboardSurface) => {
     startTransition(() => {
@@ -1057,6 +1278,14 @@ export function TrainingWorkspace({
       });
     });
   }, []);
+  const openProfileForClient = useCallback(
+    (clientId: string) => {
+      setHistoryError(null);
+      setSelectedClientId(clientId);
+      selectDashboardSurface("profile");
+    },
+    [selectDashboardSurface],
+  );
 
   const openLiveMode = useCallback(() => {
     setHistoryError(null);
@@ -1072,7 +1301,7 @@ export function TrainingWorkspace({
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
             <p className="text-[11px] uppercase tracking-[0.18em] text-white/42">Score actual</p>
             <p className="mt-3 text-4xl font-semibold text-white">{profileReadiness.score}</p>
-            <p className="mt-2 text-sm text-white/58">{readinessPalette[profileReadiness.status].label}</p>
+            <p className="mt-2 text-sm text-white/58">{readinessLabel}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4">
@@ -1085,7 +1314,9 @@ export function TrainingWorkspace({
             </div>
           </div>
           <div className="rounded-[1.3rem] border border-white/10 bg-white/6 p-4 leading-7">
-            Se calcula con sobrecarga neural semanal, gap de recuperación dinámica y soporte nutricional capturado en sesiones reales del cliente.
+            {hasProfileInsights
+              ? "Se calcula con sobrecarga neural semanal, gap de recuperación dinámica y soporte nutricional capturado en sesiones reales del cliente."
+              : "Todavía no hay sesiones guardadas para este atleta. Guardá la primera sesión y acá se activa la lectura real de readiness."}
           </div>
         </div>
       ),
@@ -1220,7 +1451,46 @@ export function TrainingWorkspace({
     );
   });
 
+  const onboardingCanSubmit =
+    athleteOnboardingForm.fullName.trim().length >= 2 &&
+    Number.isFinite(parsePositiveInputMetric(athleteOnboardingForm.ageYears)) &&
+    Number.isFinite(parsePositiveInputMetric(athleteOnboardingForm.weightKg)) &&
+    Number.isFinite(parsePositiveInputMetric(athleteOnboardingForm.heightCm));
+
+  const persistClientProfile = useCallback(
+    async (payload: { fullName: string; goal?: string; notes?: string }) => {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const raw = (await response.json()) as unknown;
+
+      if (!response.ok) {
+        const message =
+          typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
+            ? raw.error
+            : "No se pudo crear el cliente.";
+
+        throw new Error(message);
+      }
+
+      const data = clientCreateResponseSchema.parse(raw);
+
+      if (data.client) {
+        setClients((current) => [data.client!, ...current]);
+        setSelectedClientId(data.client.id);
+      }
+
+      return data.client ?? null;
+    },
+    [],
+  );
+
   const refreshClients = useCallback(() => {
+    setIsResolvingClients(true);
     startClientTransition(async () => {
       try {
         const response = await fetch("/api/clients", {
@@ -1243,11 +1513,7 @@ export function TrainingWorkspace({
         setStorageMode(data.storage);
 
         setSelectedClientId((current) => {
-          if (current && data.clients.some((client) => client.id === current)) {
-            return current;
-          }
-
-          return data.clients[0]?.id ?? null;
+          return resolvePinnedClientId(data.clients, current);
         });
       } catch (caughtError) {
         setClients([]);
@@ -1255,6 +1521,9 @@ export function TrainingWorkspace({
         setHistoryError(
           caughtError instanceof Error ? caughtError.message : "No se pudieron leer los clientes.",
         );
+      } finally {
+        setIsResolvingClients(false);
+        setHasResolvedInitialClients(true);
       }
     });
   }, [startClientTransition]);
@@ -1428,6 +1697,22 @@ export function TrainingWorkspace({
   }, [bootstrap, refreshClients]);
 
   useEffect(() => {
+    if (!hasResolvedInitialClients || isResolvingClients) {
+      return;
+    }
+
+    setShowAthleteOnboarding(persistenceEnabled && clients.length === 0);
+  }, [clients.length, hasResolvedInitialClients, isResolvingClients, persistenceEnabled]);
+
+  useEffect(() => {
+    const pinnedClientId = resolvePinnedClientId(clients, selectedClientId);
+
+    if (pinnedClientId !== selectedClientId) {
+      setSelectedClientId(pinnedClientId);
+    }
+  }, [clients, selectedClientId]);
+
+  useEffect(() => {
     const storedClientId = window.localStorage.getItem("musculator:selected-client-id");
 
     if (!storedClientId) {
@@ -1568,15 +1853,25 @@ export function TrainingWorkspace({
           },
           body: JSON.stringify(session),
         });
-        const raw = (await response.json()) as unknown;
+        const { raw, bodyText } = await parseResponseBody(response);
+
+        if (!raw && /<!doctype html>|<html/i.test(bodyText)) {
+          throw new Error(
+            "El servidor devolvió HTML en vez de JSON (error temporal del runtime). Reiniciá el dev server y recargá la página.",
+          );
+        }
 
         if (!response.ok) {
           const message =
             typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
               ? raw.error
-              : "No se pudo guardar la sesion.";
+              : bodyText.trim().slice(0, 180) || "No se pudo guardar la sesion.";
 
           throw new Error(message);
+        }
+
+        if (!raw) {
+          throw new Error("Respuesta inválida del servidor al guardar la sesión.");
         }
 
         const data = trainingSessionSaveResponseSchema.parse(raw);
@@ -1677,43 +1972,96 @@ export function TrainingWorkspace({
     startClientTransition(async () => {
       try {
         setHistoryError(null);
+        const payload: { fullName: string; goal?: string; notes?: string } = {
+          fullName: clientForm.fullName.trim(),
+        };
 
-        const response = await fetch("/api/clients", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fullName: clientForm.fullName,
-            goal: clientForm.goal || undefined,
-            notes: clientForm.notes || undefined,
-          }),
-        });
-        const raw = (await response.json()) as unknown;
+        const normalizedGoal = clientForm.goal.trim();
+        const normalizedNotes = clientForm.notes.trim();
 
-        if (!response.ok) {
-          const message =
-            typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
-              ? raw.error
-              : "No se pudo crear el cliente.";
-
-          throw new Error(message);
+        if (normalizedGoal) {
+          payload.goal = normalizedGoal;
         }
 
-        const data = clientCreateResponseSchema.parse(raw);
+        if (normalizedNotes) {
+          payload.notes = normalizedNotes;
+        }
 
-        if (data.client) {
-          setClients((current) => [data.client!, ...current]);
-          setSelectedClientId(data.client.id);
+        const createdClient = await persistClientProfile(payload);
+
+        if (createdClient) {
           setClientForm({
             fullName: "",
             goal: "",
             notes: "",
           });
+        } else {
+          throw new Error("No se pudo crear el cliente. Revisá la conexión y volvé a intentar.");
         }
       } catch (caughtError) {
         setHistoryError(
           caughtError instanceof Error ? caughtError.message : "No se pudo crear el cliente.",
+        );
+      }
+    });
+  };
+
+  const createAthleteFromOnboarding = () => {
+    startClientTransition(async () => {
+      try {
+        setHistoryError(null);
+        setOnboardingError(null);
+
+        const fullName = athleteOnboardingForm.fullName.trim();
+        const ageYears = parsePositiveInputMetric(athleteOnboardingForm.ageYears);
+        const weightKg = parsePositiveInputMetric(athleteOnboardingForm.weightKg);
+        const heightCm = parsePositiveInputMetric(athleteOnboardingForm.heightCm);
+
+        if (fullName.length < 2) {
+          throw new Error("Escribí un nombre válido para crear el atleta.");
+        }
+
+        if (!Number.isFinite(weightKg) || weightKg < 35 || weightKg > 280) {
+          throw new Error("Ingresá un peso válido en kg.");
+        }
+
+        if (!Number.isFinite(ageYears) || ageYears < 12 || ageYears > 100) {
+          throw new Error("Ingresá una edad válida.");
+        }
+
+        if (!Number.isFinite(heightCm) || heightCm < 130 || heightCm > 230) {
+          throw new Error("Ingresá una altura válida en cm.");
+        }
+
+        const heightMeters = heightCm / 100;
+        const sexLabel = athleteOnboardingForm.sex === "female" ? "mujer" : "hombre";
+        const notes = `${Math.round(ageYears)} años. Sexo: ${sexLabel}. ${heightMeters.toFixed(2)} m. ${weightKg.toFixed(1)} kg.`;
+        const defaultGoal =
+          athleteOnboardingForm.sex === "female"
+            ? "Base general atleta mujer"
+            : "Base general atleta hombre";
+
+        const createdClient = await persistClientProfile({
+          fullName,
+          goal: defaultGoal,
+          notes,
+        });
+
+        if (createdClient) {
+          setShowAthleteOnboarding(false);
+          setAthleteOnboardingForm({
+            fullName: "",
+            sex: "male",
+            ageYears: "",
+            weightKg: "",
+            heightCm: "",
+          });
+        } else {
+          throw new Error("No se pudo crear el atleta. Revisá la conexión y volvé a intentar.");
+        }
+      } catch (caughtError) {
+        setOnboardingError(
+          caughtError instanceof Error ? caughtError.message : "No se pudo crear el atleta.",
         );
       }
     });
@@ -1729,6 +2077,7 @@ export function TrainingWorkspace({
       startLiveSession({
         sessionId: liveSessionId,
         templateId: selectedTemplateId,
+        clientId: selectedClientId,
         draft,
       });
 
@@ -1769,6 +2118,136 @@ export function TrainingWorkspace({
 
   return (
     <div className="min-w-0 text-white">
+      {showAthleteOnboarding ? (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-3 backdrop-blur sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-[2rem] border border-white/12 bg-[#0b1420] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
+            <p className="text-sm uppercase tracking-[0.24em] text-white/45">Primer atleta</p>
+            <h2 className="mt-3 text-3xl font-semibold text-white">Completemos tu perfil base</h2>
+            <p className="mt-3 text-sm leading-7 text-white/60">
+              Para habilitar Perfil, Nutrición y Live, cargá al menos un atleta con sus métricas iniciales.
+            </p>
+
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-2 text-sm text-white/65">
+                Nombre
+                <input
+                  value={athleteOnboardingForm.fullName}
+                  onChange={(event) =>
+                    setAthleteOnboardingForm((current) => ({
+                      ...current,
+                      fullName: event.target.value,
+                    }))
+                  }
+                  placeholder="Ej: Martina Alvarez"
+                  className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-[#4cb894]"
+                />
+              </label>
+
+              <div className="grid gap-2 text-sm text-white/65">
+                Sexo
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAthleteOnboardingForm((current) => ({
+                        ...current,
+                        sex: "male",
+                      }))
+                    }
+                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                      athleteOnboardingForm.sex === "male"
+                        ? "border-[#4cb894]/70 bg-[#4cb894]/15 text-emerald-100"
+                        : "border-white/10 bg-white/6 text-white/72 hover:bg-white/10"
+                    }`}
+                  >
+                    Hombre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAthleteOnboardingForm((current) => ({
+                        ...current,
+                        sex: "female",
+                      }))
+                    }
+                    className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                      athleteOnboardingForm.sex === "female"
+                        ? "border-[#4cb894]/70 bg-[#4cb894]/15 text-emerald-100"
+                        : "border-white/10 bg-white/6 text-white/72 hover:bg-white/10"
+                    }`}
+                  >
+                    Mujer
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="grid gap-2 text-sm text-white/65">
+                  Edad
+                  <input
+                    value={athleteOnboardingForm.ageYears}
+                    inputMode="numeric"
+                    onChange={(event) =>
+                      setAthleteOnboardingForm((current) => ({
+                        ...current,
+                        ageYears: event.target.value,
+                      }))
+                    }
+                    placeholder="28"
+                    className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-[#4cb894]"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-white/65">
+                  Peso (kg)
+                  <input
+                    value={athleteOnboardingForm.weightKg}
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setAthleteOnboardingForm((current) => ({
+                        ...current,
+                        weightKg: event.target.value,
+                      }))
+                    }
+                    placeholder="78.5"
+                    className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-[#4cb894]"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm text-white/65">
+                  Altura (cm)
+                  <input
+                    value={athleteOnboardingForm.heightCm}
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setAthleteOnboardingForm((current) => ({
+                        ...current,
+                        heightCm: event.target.value,
+                      }))
+                    }
+                    placeholder="176"
+                    className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/30 focus:border-[#4cb894]"
+                  />
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={createAthleteFromOnboarding}
+                disabled={isCreatingClient || !onboardingCanSubmit}
+                className="mt-1 inline-flex min-h-12 items-center justify-center rounded-full bg-[#4cb894] px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isCreatingClient ? "Creando atleta..." : "Guardar y continuar"}
+              </button>
+            </div>
+
+            {onboardingError ? (
+              <p className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {onboardingError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {showCheckIn ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur sm:items-center sm:p-4">
           <div className="flex max-h-[min(92svh,100%)] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0c1420] shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
@@ -2008,7 +2487,6 @@ export function TrainingWorkspace({
                     ? selectedClient.goal ?? "Todavía no hay un objetivo principal definido para este atleta."
                     : "Elegí Entrenar para arrancar, o entrá al Lab para editar el arsenal."
                 }
-                onOpenClients={() => selectDashboardSurface("clients")}
                 metrics={profileHeroMetrics}
               />
 
@@ -2067,7 +2545,7 @@ export function TrainingWorkspace({
                   {bodyInsightsView === "anatomy" ? (
                     <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                       <div>
-                        <AnatomyHeatmap muscles={analysis.muscleLoad} />
+                        <AnatomyHeatmap muscles={hasSessionHistory ? historyMuscleLoad : []} />
                         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs uppercase tracking-[0.18em] text-white/45">
                           <span className="inline-flex items-center gap-2">
                             <span className="h-3 w-3 shrink-0 rounded-[4px] bg-rose-400" />
@@ -2085,22 +2563,28 @@ export function TrainingWorkspace({
                       </div>
 
                       <aside className="grid gap-3 self-start">
-                        {priorityRecoveryMuscles.map((muscle) => (
-                          <div
-                            key={muscle.muscle}
-                            className={`rounded-[1.2rem] border px-4 py-3 ${muscleTone[muscle.tone]}`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold">{muscle.label}</p>
-                              <span className="text-xs uppercase tracking-[0.14em] opacity-80">
-                                {muscle.recoveryTimeHours}h
-                              </span>
+                        {priorityRecoveryMuscles.length > 0 ? (
+                          priorityRecoveryMuscles.map((muscle) => (
+                            <div
+                              key={muscle.muscle}
+                              className={`rounded-[1.2rem] border px-4 py-3 ${muscleTone[muscle.tone]}`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-semibold">{muscle.label}</p>
+                                <span className="text-xs uppercase tracking-[0.14em] opacity-80">
+                                  {muscle.recoveryTimeHours}h
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs uppercase tracking-[0.16em] opacity-65">
+                                {muscle.totalSets} sets acumulados
+                              </p>
                             </div>
-                            <p className="mt-1 text-xs uppercase tracking-[0.16em] opacity-65">
-                              {muscle.totalSets} sets acumulados
-                            </p>
+                          ))
+                        ) : (
+                          <div className="rounded-[1.2rem] border border-white/10 bg-white/6 px-4 py-4 text-sm text-white/58">
+                            Sin carga muscular registrada todavía para este atleta.
                           </div>
-                        ))}
+                        )}
                         <button
                           type="button"
                           onClick={openAnatomySheet}
@@ -2130,12 +2614,12 @@ export function TrainingWorkspace({
 
               <ProfileDecisionRow
                 readinessScore={profileReadiness.score}
-                readinessLabel={readinessPalette[profileReadiness.status].label}
-                readinessToneClass={readinessTone[profileReadiness.status]}
-                readinessRingColor={readinessPalette[profileReadiness.status].solid}
-                readinessRingSoft={readinessPalette[profileReadiness.status].soft}
+                readinessLabel={readinessLabel}
+                readinessToneClass={readinessToneClass}
+                readinessRingColor={readinessRingColor}
+                readinessRingSoft={readinessRingSoft}
                 readinessCentralPenalty={formatRounded(profileReadiness.centralPenalty)}
-                showCriticalAlert={profileReadiness.status === "red"}
+                showCriticalAlert={showCriticalAlert}
                 weeklyNeuralCost={weeklyNeuralCost}
                 weeklyNeuralTarget={weeklyNeuralTarget}
                 weeklyNeuralDelta={weeklyNeuralDelta}
@@ -2268,30 +2752,36 @@ export function TrainingWorkspace({
                 <article className="min-w-0 overflow-hidden rounded-[2.35rem] border border-white/8 bg-[#0d1724] p-5 shadow-[0_24px_80px_rgba(2,6,23,0.28)] sm:p-6">
                   <p className="text-sm uppercase tracking-[0.24em] text-white/45">Balance de vectores</p>
                   <div className="mt-4 grid gap-3">
-                    {profileStimulusBalance.map((slice) => (
-                      <div
-                        key={slice.stimulusVector}
-                        className="min-w-0 rounded-[1.3rem] border border-white/10 bg-white/6 p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-medium text-white">{stimulusLabel[slice.stimulusVector]}</p>
-                          <span className="text-sm tabular-nums text-white/55">
-                            {slice.totalSets} sets · objetivo {slice.targetSets.toFixed(1)}
-                          </span>
+                    {profileStimulusBalance.length > 0 ? (
+                      profileStimulusBalance.map((slice) => (
+                        <div
+                          key={slice.stimulusVector}
+                          className="min-w-0 rounded-[1.3rem] border border-white/10 bg-white/6 p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-medium text-white">{stimulusLabel[slice.stimulusVector]}</p>
+                            <span className="text-sm tabular-nums text-white/55">
+                              {slice.totalSets} sets · objetivo {slice.targetSets.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
+                            <div
+                              className="h-full rounded-full bg-[#4cb894]"
+                              style={{
+                                width: `${Math.max((slice.totalSets / Math.max(slice.targetSets, 1)) * 100, 8)}%`,
+                              }}
+                            />
+                          </div>
+                          <p className="mt-2 text-sm text-white/52">
+                            {formatLoadKg(slice.totalLoadKg)} de volumen acumulado.
+                          </p>
                         </div>
-                        <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
-                          <div
-                            className="h-full rounded-full bg-[#4cb894]"
-                            style={{
-                              width: `${Math.max((slice.totalSets / Math.max(slice.targetSets, 1)) * 100, 8)}%`,
-                            }}
-                          />
-                        </div>
-                        <p className="mt-2 text-sm text-white/52">
-                          {formatLoadKg(slice.totalLoadKg)} de volumen acumulado.
-                        </p>
+                      ))
+                    ) : (
+                      <div className="min-w-0 rounded-[1.3rem] border border-white/10 bg-white/6 p-4 text-sm text-white/58">
+                        Sin sesiones guardadas todavía para construir el balance de vectores.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </article>
               </section>
@@ -2401,7 +2891,7 @@ export function TrainingWorkspace({
                     <button
                       key={client.id}
                       type="button"
-                      onClick={() => setSelectedClientId(client.id)}
+                      onClick={() => openProfileForClient(client.id)}
                       className={`rounded-[1.35rem] border p-4 text-left transition ${
                         selectedClientId === client.id
                           ? "border-[#4cb894]/50 bg-[#4cb894]/10"

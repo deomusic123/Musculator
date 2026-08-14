@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useLiveSessionStore } from "@/lib/live/live-session-store";
+import { trainingSessionSaveResponseSchema, type TrainingSessionDraft } from "@musculator/contracts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { type LiveCompletedSet, useLiveSessionStore } from "@/lib/live/live-session-store";
 
 interface LiveSessionShellProps {
   sessionId: string;
@@ -18,11 +19,80 @@ function formatDuration(totalSeconds: number) {
   return `${minutes}:${remainder}`;
 }
 
+async function parseResponseBody(response: Response) {
+  const bodyText = await response.text();
+
+  if (!bodyText) {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
+
+  try {
+    return {
+      raw: JSON.parse(bodyText) as unknown,
+      bodyText,
+    };
+  } catch {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
+}
+
+function buildPersistedDraftFromLive(
+  draft: TrainingSessionDraft,
+  completedSets: LiveCompletedSet[],
+  startedAtMs: number | null,
+) {
+  const completionBySet = completedSets.reduce((accumulator, item) => {
+    accumulator.set(`${item.entryIndex}:${item.setIndex}`, item);
+    return accumulator;
+  }, new Map<string, LiveCompletedSet>());
+
+  const missingSetKey = draft.entries
+    .flatMap((entry, entryIndex) =>
+      entry.sets.map((_, setIndex) => `${entryIndex}:${setIndex}`),
+    )
+    .find((key) => !completionBySet.has(key));
+
+  if (missingSetKey) {
+    throw new Error("Faltan sets por completar antes de sincronizar la sesión.");
+  }
+
+  return {
+    ...draft,
+    startedAt: draft.startedAt ?? (startedAtMs ? new Date(startedAtMs).toISOString() : undefined),
+    entries: draft.entries.map((entry, entryIndex) => ({
+      ...entry,
+      sets: entry.sets.map((set, setIndex) => {
+        const completed = completionBySet.get(`${entryIndex}:${setIndex}`);
+
+        if (!completed) {
+          return set;
+        }
+
+        return {
+          ...set,
+          reps: completed.reps,
+          weightKg: completed.weightKg,
+          rpe: completed.rpe,
+        };
+      }),
+    })),
+  } satisfies TrainingSessionDraft;
+}
+
 export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
   const [clockNow, setClockNow] = useState(Date.now());
   const [hydrated, setHydrated] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const draft = useLiveSessionStore((state) => state.draft);
   const sessionIdInStore = useLiveSessionStore((state) => state.sessionId);
+  const clientId = useLiveSessionStore((state) => state.clientId);
   const startedAtMs = useLiveSessionStore((state) => state.startedAtMs);
   const pausedAtMs = useLiveSessionStore((state) => state.pausedAtMs);
   const pausedAccumulatedMs = useLiveSessionStore((state) => state.pausedAccumulatedMs);
@@ -97,6 +167,78 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
   const completedCount = completedSets.length;
   const progressPercent = totalSets > 0 ? Math.round((completedCount / totalSets) * 100) : 0;
   const workoutDone = Boolean(draft && completedCount >= totalSets && totalSets > 0);
+
+  const persistCompletedSession = useCallback(async () => {
+    if (!draft || sessionIdInStore !== sessionId) {
+      return;
+    }
+
+    if (!clientId) {
+      setSaveState("error");
+      setSaveFeedback("No hay cliente activo para guardar la sesión live.");
+      return;
+    }
+
+    try {
+      setSaveState("saving");
+      setSaveFeedback("Sincronizando sesión con el historial...");
+
+      const persistedDraft = buildPersistedDraftFromLive(draft, completedSets, startedAtMs);
+      const response = await fetch("/api/training/sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-client-id": clientId,
+        },
+        body: JSON.stringify(persistedDraft),
+      });
+      const { raw, bodyText } = await parseResponseBody(response);
+
+      if (!raw && /<!doctype html>|<html/i.test(bodyText)) {
+        throw new Error("El servidor devolvió HTML en vez de JSON al guardar la sesión live.");
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
+            ? raw.error
+            : bodyText.trim().slice(0, 180) || "No se pudo guardar la sesión live.";
+
+        throw new Error(message);
+      }
+
+      if (!raw) {
+        throw new Error("Respuesta inválida del servidor al guardar la sesión live.");
+      }
+
+      const parsed = trainingSessionSaveResponseSchema.parse(raw);
+
+      setSaveState("saved");
+      setSaveFeedback(
+        parsed.storage === "supabase"
+          ? "Sesión live guardada automáticamente en el historial."
+          : "Sesión live validada en modo preview (sin persistencia remota).",
+      );
+    } catch (caughtError) {
+      setSaveState("error");
+      setSaveFeedback(
+        caughtError instanceof Error ? caughtError.message : "No se pudo guardar la sesión live.",
+      );
+    }
+  }, [clientId, completedSets, draft, sessionId, sessionIdInStore, startedAtMs]);
+
+  useEffect(() => {
+    if (!workoutDone || !hydrated || saveState !== "idle") {
+      return;
+    }
+
+    void persistCompletedSession();
+  }, [hydrated, persistCompletedSession, saveState, workoutDone]);
+
+  useEffect(() => {
+    setSaveState("idle");
+    setSaveFeedback(null);
+  }, [sessionId]);
 
   if (!hydrated) {
     return (
@@ -217,6 +359,24 @@ export function LiveSessionShell({ sessionId }: LiveSessionShellProps) {
             <p className="mt-2 text-sm leading-7 text-white/70">
               Marcaste {completedCount} series de {draft.title}. Volvé al dashboard para revisar readiness o arrancá otra rutina.
             </p>
+            <div className="mt-4 rounded-[1.1rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80">
+              {saveState === "saving"
+                ? "Guardando sesión live..."
+                : saveFeedback ?? "La sesión se guardará automáticamente al finalizar."}
+            </div>
+            {saveState === "error" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveState("idle");
+                  setSaveFeedback(null);
+                  void persistCompletedSession();
+                }}
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-rose-300/35 bg-rose-500/10 px-4 text-xs font-semibold uppercase tracking-[0.14em] text-rose-100 transition hover:bg-rose-500/20"
+              >
+                Reintentar guardado
+              </button>
+            ) : null}
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
                 href="/"

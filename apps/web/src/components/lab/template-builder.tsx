@@ -135,6 +135,8 @@ export function TemplateBuilder({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [draggedEntryIndex, setDraggedEntryIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
   const skipInitialTemplateFetch = useRef(initialTemplate?.template.id ?? null);
 
@@ -279,6 +281,34 @@ export function TemplateBuilder({
     }));
   };
 
+  const moveEntry = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= template.entries.length ||
+      toIndex >= template.entries.length
+    ) {
+      return;
+    }
+
+    updateTemplate((current) => {
+      const nextEntries = [...current.entries];
+      const [moved] = nextEntries.splice(fromIndex, 1);
+
+      if (!moved) {
+        return current;
+      }
+
+      nextEntries.splice(toIndex, 0, moved);
+
+      return {
+        ...current,
+        entries: nextEntries,
+      };
+    });
+  };
+
   const saveTemplate = async () => {
     setIsSaving(true);
     setLoadError(null);
@@ -305,13 +335,16 @@ export function TemplateBuilder({
         throw new Error("error" in body ? body.error : "No se pudo guardar el template.");
       }
 
+      const wasForkedFromSystem = Boolean(selectedTemplateId && body.template.id !== selectedTemplateId);
       setTemplate(body.template);
       setSelectedTemplateId(body.template.id);
       setStorageMode(body.storage);
       await refreshTemplateList();
       setStatusMessage(
         body.saveStatus === "saved"
-          ? "Template guardado y sincronizado con la base de datos."
+          ? wasForkedFromSystem
+            ? "Template del sistema guardado como copia editable propia."
+            : "Template guardado y sincronizado con la base de datos."
           : "Template validado en modo preview (sin persistencia Supabase).",
       );
     } catch (caughtError) {
@@ -465,27 +498,72 @@ export function TemplateBuilder({
           {template.entries.map((entry, index) => {
             const cnsTax = entry.exerciseSlug ? exerciseBySlug.get(entry.exerciseSlug)?.cnsTaxMultiplier ?? 0 : 0;
             const neuralCost = toOneDecimal(entry.targetSets * cnsTax);
+            const isDragging = draggedEntryIndex === index;
+            const isDropTarget =
+              draggedEntryIndex !== null && dropTargetIndex === index && draggedEntryIndex !== index;
 
             return (
-              <div key={`${entry.exerciseSlug ?? "raw"}-${index}`} className="rounded-[1.2rem] border border-[var(--border)] bg-white/70 p-4">
+              <div
+                key={`${entry.exerciseSlug ?? "raw"}-${index}`}
+                draggable={template.entries.length > 1}
+                onDragStart={() => {
+                  setDraggedEntryIndex(index);
+                  setDropTargetIndex(index);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (draggedEntryIndex !== null && draggedEntryIndex !== index) {
+                    setDropTargetIndex(index);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (draggedEntryIndex !== null) {
+                    moveEntry(draggedEntryIndex, index);
+                  }
+                  setDraggedEntryIndex(null);
+                  setDropTargetIndex(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedEntryIndex(null);
+                  setDropTargetIndex(null);
+                }}
+                className={`rounded-[1.2rem] border bg-white/70 p-4 transition ${
+                  isDragging
+                    ? "cursor-grabbing border-slate-900/40 opacity-70"
+                    : isDropTarget
+                      ? "cursor-grab border-slate-900/40 ring-2 ring-slate-900/15"
+                      : "cursor-grab border-[var(--border)]"
+                }`}
+                title="Arrastrá la card para reordenar"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[var(--ink)]">{index + 1}. {getEntryLabel(entry, exerciseNameBySlug)}</p>
-                  <button
-                    type="button"
-                    onClick={() => removeEntry(index)}
-                    className="inline-flex min-h-9 items-center justify-center rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-500"
-                  >
-                    Quitar
-                  </button>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="select-none text-base text-slate-400">⋮⋮</span>
+                    <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                      {index + 1}. {getEntryLabel(entry, exerciseNameBySlug)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => removeEntry(index)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-full border border-rose-400 px-3 py-1 text-xs font-semibold text-rose-500"
+                    >
+                      Quitar
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-5">
-                  <label className="grid gap-1 text-xs text-[var(--muted)]">
+                <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-[repeat(4,minmax(0,1fr))_120px]">
+                  <label className="grid min-w-0 gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
                     Sets
                     <input
                       type="number"
                       min={1}
                       max={20}
+                      step={1}
+                      inputMode="numeric"
                       value={entry.targetSets}
                       onChange={(event) => {
                         const nextSets = Math.max(1, Number(event.target.value) || 1);
@@ -501,15 +579,17 @@ export function TemplateBuilder({
                           ),
                         }));
                       }}
-                      className="rounded-lg border border-[var(--border)] bg-white px-2 py-2 text-sm text-[var(--ink)]"
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium tabular-nums text-slate-900 outline-none transition [appearance:textfield] focus:border-slate-900/35 focus:ring-2 focus:ring-slate-900/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </label>
 
-                  <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <label className="grid min-w-0 gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
                     Reps min
                     <input
                       type="number"
                       min={1}
+                      step={1}
+                      inputMode="numeric"
                       value={entry.targetRepsMin ?? ""}
                       onChange={(event) => {
                         const value = event.target.value ? Number(event.target.value) : undefined;
@@ -525,15 +605,17 @@ export function TemplateBuilder({
                           ),
                         }));
                       }}
-                      className="rounded-lg border border-[var(--border)] bg-white px-2 py-2 text-sm text-[var(--ink)]"
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium tabular-nums text-slate-900 outline-none transition [appearance:textfield] focus:border-slate-900/35 focus:ring-2 focus:ring-slate-900/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </label>
 
-                  <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <label className="grid min-w-0 gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
                     Reps max
                     <input
                       type="number"
                       min={1}
+                      step={1}
+                      inputMode="numeric"
                       value={entry.targetRepsMax ?? ""}
                       onChange={(event) => {
                         const value = event.target.value ? Number(event.target.value) : undefined;
@@ -549,17 +631,18 @@ export function TemplateBuilder({
                           ),
                         }));
                       }}
-                      className="rounded-lg border border-[var(--border)] bg-white px-2 py-2 text-sm text-[var(--ink)]"
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium tabular-nums text-slate-900 outline-none transition [appearance:textfield] focus:border-slate-900/35 focus:ring-2 focus:ring-slate-900/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </label>
 
-                  <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <label className="grid min-w-0 gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
                     RPE
                     <input
                       type="number"
                       min={1}
                       max={10}
                       step={0.5}
+                      inputMode="decimal"
                       value={entry.targetRpe ?? ""}
                       onChange={(event) => {
                         const value = event.target.value ? Number(event.target.value) : undefined;
@@ -575,13 +658,13 @@ export function TemplateBuilder({
                           ),
                         }));
                       }}
-                      className="rounded-lg border border-[var(--border)] bg-white px-2 py-2 text-sm text-[var(--ink)]"
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium tabular-nums text-slate-900 outline-none transition [appearance:textfield] focus:border-slate-900/35 focus:ring-2 focus:ring-slate-900/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </label>
 
-                  <div className="grid gap-1 text-xs text-[var(--muted)]">
+                  <div className="grid min-w-0 gap-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
                     Costo CNS
-                    <p className="rounded-lg border border-slate-900/20 bg-slate-900 px-2 py-2 text-sm font-semibold text-white">
+                    <p className="flex h-12 items-center rounded-xl border border-slate-900/20 bg-slate-900 px-3 text-sm font-semibold tabular-nums text-white">
                       {neuralCost.toFixed(1)}
                     </p>
                   </div>

@@ -16,6 +16,7 @@ export interface LiveCompletedSet {
 interface LiveSessionState {
   sessionId: string | null;
   templateId: string | null;
+  clientId: string | null;
   draft: TrainingSessionDraft | null;
   startedAtMs: number | null;
   pausedAtMs: number | null;
@@ -28,6 +29,7 @@ interface LiveSessionState {
   startLiveSession: (payload: {
     sessionId: string;
     templateId: string | null;
+    clientId: string | null;
     draft: TrainingSessionDraft;
   }) => void;
   initializeSession: (sessionId: string) => void;
@@ -41,6 +43,7 @@ interface LiveSessionState {
 const emptyState = {
   sessionId: null,
   templateId: null,
+  clientId: null,
   draft: null,
   startedAtMs: null,
   pausedAtMs: null,
@@ -56,10 +59,11 @@ export const useLiveSessionStore = create<LiveSessionState>()(
   persist(
     (set, get) => ({
       ...emptyState,
-      startLiveSession: ({ sessionId, templateId, draft }) => {
+      startLiveSession: ({ sessionId, templateId, clientId, draft }) => {
         set({
           sessionId,
           templateId,
+          clientId,
           draft,
           startedAtMs: Date.now(),
           pausedAtMs: null,
@@ -182,6 +186,7 @@ export const useLiveSessionStore = create<LiveSessionState>()(
       partialize: (state) => ({
         sessionId: state.sessionId,
         templateId: state.templateId,
+        clientId: state.clientId,
         draft: state.draft,
         startedAtMs: state.startedAtMs,
         pausedAtMs: state.pausedAtMs,

@@ -853,18 +853,18 @@ function createEmptyAnalytics(clientId: string): ClientProfileAnalyticsResponse 
     analytics: {
       clientId,
       readiness: {
-        score: 62,
+        score: 0,
         status: "amber",
-        centralPenalty: 12,
-        localPenalty: 10,
-        recoveryBonus: 2,
+        centralPenalty: 0,
+        localPenalty: 0,
+        recoveryBonus: 0,
       },
       weeklyNeuralCost: 0,
       weeklyNeuralTarget: 0,
       weeklyNeuralDelta: 0,
       recoveryGapHours: 0,
       nutritionRecoveryGap: 0,
-      nutritionSupportRatio: 1,
+      nutritionSupportRatio: 0,
       targetSupportRatio: 1,
       radarAxes: [
         { key: "verticalPull", label: "Traccion vertical", actualPercent: 0, targetPercent: 0, gapPercent: 0 },

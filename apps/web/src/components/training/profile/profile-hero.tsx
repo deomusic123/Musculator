@@ -17,7 +17,6 @@ interface ProfileHeroProps {
   athleteInitials: string;
   athleteTitle: string;
   goalText: string;
-  onOpenClients: () => void;
   metrics: ProfileHeroMetric[];
 }
 
@@ -33,7 +32,6 @@ export const ProfileHero = memo(function ProfileHero({
   athleteInitials,
   athleteTitle,
   goalText,
-  onOpenClients,
   metrics,
 }: ProfileHeroProps) {
   return (
@@ -61,13 +59,6 @@ export const ProfileHero = memo(function ProfileHero({
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="text-sm uppercase tracking-[0.24em] text-white/42">Perfil y telemetría</p>
-                  <button
-                    type="button"
-                    onClick={onOpenClients}
-                    className="text-sm font-medium text-[#9cf3d3] underline-offset-2 transition hover:underline"
-                  >
-                    Clientes
-                  </button>
                 </div>
                 <h1 className="mt-3 break-words text-2xl font-semibold leading-tight text-white sm:text-3xl md:text-4xl">
                   {athleteTitle}

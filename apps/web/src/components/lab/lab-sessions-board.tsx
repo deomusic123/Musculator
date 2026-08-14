@@ -52,6 +52,29 @@ const knownMuscleSlugs: MuscleGroupSlug[] = [
 const knownMuscleSlugSet = new Set<string>(knownMuscleSlugs);
 const exercisePickerRecentStorageKey = "lab-sessions-recent-exercises";
 
+async function parseResponseBody(response: Response) {
+  const bodyText = await response.text();
+
+  if (!bodyText) {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
+
+  try {
+    return {
+      raw: JSON.parse(bodyText) as unknown,
+      bodyText,
+    };
+  } catch {
+    return {
+      raw: null as unknown,
+      bodyText,
+    };
+  }
+}
+
 function normalizeSearchTerm(value: string) {
   return value.trim().toLowerCase();
 }
@@ -361,6 +384,8 @@ export function LabSessionsBoard({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [isSaving, startSavingTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const exercisePickerRef = useRef<HTMLDivElement | null>(null);
 
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
@@ -525,15 +550,25 @@ export function LabSessionsBoard({
         cache: "no-store",
       },
     );
-    const raw = (await response.json()) as unknown;
+    const { raw, bodyText } = await parseResponseBody(response);
+
+    if (!raw && /<!doctype html>|<html/i.test(bodyText)) {
+      throw new Error(
+        "El servidor respondió HTML en lugar de JSON. Reinicia el dev server y recarga la página.",
+      );
+    }
 
     if (!response.ok) {
       const message =
         typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
           ? raw.error
-          : "No se pudo cargar el historial de sesiones.";
+          : bodyText.trim().slice(0, 180) || "No se pudo cargar el historial de sesiones.";
 
       throw new Error(message);
+    }
+
+    if (!raw) {
+      throw new Error("Respuesta inválida del servidor al cargar sesiones.");
     }
 
     const parsed = trainingHistoryResponseSchema.parse(raw);
@@ -664,26 +699,113 @@ export function LabSessionsBoard({
     }));
   };
 
-  const onClientChange = (value: string) => {
-    const nextClientId = value || null;
-    setSelectedClientId(nextClientId);
-    setError(null);
-    setStatusMessage(null);
+  const onDeleteSession = (sessionId: string) => {
+    if (!selectedClientId) {
+      setError("No hay cliente activo para eliminar la sesion.");
+      return;
+    }
 
-    startRefreshTransition(() => {
+    const confirmed = window.confirm("¿Eliminar esta sesion? Esta accion no se puede deshacer.");
+
+    if (!confirmed) {
+      return;
+    }
+
+    startDeleteTransition(() => {
       void (async () => {
         try {
-          await refreshHistory(nextClientId);
+          setError(null);
+          setStatusMessage(null);
+          setDeletingSessionId(sessionId);
+
+          const response = await fetch(
+            `/api/training/sessions?clientId=${encodeURIComponent(selectedClientId)}&sessionId=${encodeURIComponent(sessionId)}`,
+            {
+              method: "DELETE",
+            },
+          );
+          const { raw, bodyText } = await parseResponseBody(response);
+
+          if (!raw && /<!doctype html>|<html/i.test(bodyText)) {
+            throw new Error(
+              "El servidor respondió HTML en lugar de JSON al eliminar. Reinicia el dev server y recarga la página.",
+            );
+          }
+
+          if (!response.ok) {
+            const message =
+              typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
+                ? raw.error
+                : bodyText.trim().slice(0, 180) || "No se pudo eliminar la sesion.";
+
+            throw new Error(message);
+          }
+
+          setHistory((current) =>
+            current.filter((currentSession) => currentSession.sessionId !== sessionId),
+          );
+          setStatusMessage("Sesion eliminada correctamente.");
         } catch (caughtError) {
           setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "No se pudo cargar el historial del cliente.",
+            caughtError instanceof Error ? caughtError.message : "No se pudo eliminar la sesion.",
           );
+        } finally {
+          setDeletingSessionId(null);
         }
       })();
     });
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || clients.length === 0) {
+      return;
+    }
+
+    const syncActiveClient = (rawClientId: string | null) => {
+      const nextClientId =
+        rawClientId && clients.some((client) => client.id === rawClientId)
+          ? rawClientId
+          : clients[0]?.id ?? null;
+
+      if (!nextClientId || nextClientId === selectedClientId) {
+        return;
+      }
+
+      setSelectedClientId(nextClientId);
+      setError(null);
+      setStatusMessage(null);
+
+      startRefreshTransition(() => {
+        void (async () => {
+          try {
+            await refreshHistory(nextClientId);
+          } catch (caughtError) {
+            setError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "No se pudo cargar el historial del cliente activo.",
+            );
+          }
+        })();
+      });
+    };
+
+    syncActiveClient(window.localStorage.getItem("musculator:selected-client-id"));
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "musculator:selected-client-id") {
+        return;
+      }
+
+      syncActiveClient(event.newValue);
+    };
+
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [clients, selectedClientId, startRefreshTransition]);
 
   const onSaveSession = () => {
     startSavingTransition(() => {
@@ -708,15 +830,25 @@ export function LabSessionsBoard({
             },
             body: JSON.stringify(draft),
           });
-          const raw = (await response.json()) as unknown;
+          const { raw, bodyText } = await parseResponseBody(response);
+
+          if (!raw && /<!doctype html>|<html/i.test(bodyText)) {
+            throw new Error(
+              "El servidor respondió HTML en lugar de JSON al guardar. Reinicia el dev server y recarga la página.",
+            );
+          }
 
           if (!response.ok) {
             const message =
               typeof raw === "object" && raw && "error" in raw && typeof raw.error === "string"
                 ? raw.error
-                : "No se pudo guardar la sesion.";
+                : bodyText.trim().slice(0, 180) || "No se pudo guardar la sesion.";
 
             throw new Error(message);
+          }
+
+          if (!raw) {
+            throw new Error("Respuesta inválida del servidor al guardar la sesión.");
           }
 
           const parsed = trainingSessionSaveResponseSchema.parse(raw);
@@ -765,21 +897,12 @@ export function LabSessionsBoard({
             </p>
           </div>
           <div className="grid gap-2 text-sm text-[var(--muted)] sm:min-w-[16rem]">
-            <label className="grid gap-2">
-              Cliente activo
-              <select
-                value={selectedClientId ?? ""}
-                onChange={(event) => onClientChange(event.target.value)}
-                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none"
-              >
-                {clients.length === 0 ? <option value="">Sin clientes</option> : null}
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+              Cliente activo (sincronizado)
+            </p>
+            <p className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-medium text-[var(--ink)]">
+              {selectedClient?.fullName ?? "Sin cliente activo"}
+            </p>
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Storage: {storageMode}</p>
           </div>
         </div>
@@ -889,7 +1012,17 @@ export function LabSessionsBoard({
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold">{session.title}</p>
-                    <span className="text-xs text-[var(--muted)]">{formatDateTime(session.startedAt)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--muted)]">{formatDateTime(session.startedAt)}</span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteSession(session.sessionId)}
+                        disabled={isDeleting && deletingSessionId === session.sessionId}
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-rose-300/45 bg-rose-50 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isDeleting && deletingSessionId === session.sessionId ? "Eliminando..." : "Eliminar"}
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-1 text-xs text-[var(--muted)]">
                     {session.totalSets} sets · {Math.round(session.totalLoadKg)} kg · RPE medio {session.averageRpe}
