@@ -16,9 +16,6 @@ declare global {
   }
 }
 
-const TOAST_VISIBLE_MS = 7000;
-const TOAST_REAPPEAR_MS = 45000;
-
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -29,65 +26,45 @@ function isRunningStandalone() {
   return byDisplayMode || iosStandalone;
 }
 
-function getCapturedInstallPrompt() {
-  if (typeof window === "undefined") {
-    return null;
+function isIOSBrowser() {
+  if (typeof navigator === "undefined") {
+    return false;
   }
 
-  return window.__musculatorInstallPromptEvent ?? null;
-}
-
-function clearCapturedInstallPrompt() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.__musculatorInstallPromptEvent = null;
+  const ua = navigator.userAgent.toLowerCase();
+  return /iphone|ipad|ipod/.test(ua);
 }
 
 export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [installFeedback, setInstallFeedback] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
-    setToastVisible(true);
-    setInstallFeedback(null);
-    setInstallPrompt(getCapturedInstallPrompt());
-
-    const onInstallPromptReady = () => {
-      setInstallPrompt(getCapturedInstallPrompt());
-    };
+    setDismissed(false);
 
     const onBeforeInstallPrompt = (event: Event) => {
       const promptEvent = event as InstallPromptEvent;
       promptEvent.preventDefault();
-      window.__musculatorInstallPromptEvent = promptEvent;
       setInstallPrompt(promptEvent);
     };
 
     const onAppInstalled = () => {
       setIsInstalled(true);
-      setToastVisible(false);
+      setDismissed(true);
       setInstallPrompt(null);
-      clearCapturedInstallPrompt();
       setInstallFeedback(null);
     };
 
-    window.addEventListener("musculator:install-prompt-ready", onInstallPromptReady as EventListener);
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
-      window.removeEventListener(
-        "musculator:install-prompt-ready",
-        onInstallPromptReady as EventListener,
-      );
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };
@@ -98,8 +75,6 @@ export function PwaInstallGuide() {
       return;
     }
 
-    setToastVisible(true);
-
     const timeoutId = window.setTimeout(() => {
       setInstallFeedback(null);
     }, 2600);
@@ -109,67 +84,36 @@ export function PwaInstallGuide() {
     };
   }, [installFeedback]);
 
-  useEffect(() => {
-    if (!toastVisible || isInstalled) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setToastVisible(false);
-    }, TOAST_VISIBLE_MS);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [isInstalled, toastVisible]);
-
-  useEffect(() => {
-    if (isInstalled) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setToastVisible(true);
-    }, TOAST_REAPPEAR_MS);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [isInstalled]);
-
   const runInstallPrompt = async () => {
+    if (!installPrompt) {
+      setInstallFeedback(
+        isIOSBrowser()
+          ? "iOS no permite instalación directa por botón en web. Usá Safari > Compartir > Añadir a inicio."
+          : "Instalador aún no disponible. Probá recargar y volver a tocar Instalar.",
+      );
+      return;
+    }
+
     setIsInstalling(true);
     try {
-      let promptEvent = installPrompt ?? getCapturedInstallPrompt();
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
 
-      if (!promptEvent) {
-        await new Promise((resolve) => window.setTimeout(resolve, 220));
-        promptEvent = getCapturedInstallPrompt();
-      }
-
-      if (promptEvent) {
-        await promptEvent.prompt();
-        const choice = await promptEvent.userChoice;
-        clearCapturedInstallPrompt();
-        setInstallPrompt(null);
-
-        if (choice.outcome === "accepted") {
-          setIsInstalled(true);
-          setInstallFeedback(null);
-          return;
-        }
-
-        setInstallFeedback("Instalación cancelada.");
+      if (choice.outcome === "accepted") {
+        setIsInstalled(true);
+        setDismissed(true);
+        setInstallFeedback(null);
         return;
       }
 
-      setInstallFeedback("Este navegador no habilita instalación directa con un toque.");
+      setInstallFeedback("Instalación cancelada.");
     } finally {
       setIsInstalling(false);
     }
   };
 
-  if (!hasMounted || isInstalled || !toastVisible) {
+  if (!hasMounted || isInstalled || dismissed) {
     return null;
   }
 
@@ -188,7 +132,7 @@ export function PwaInstallGuide() {
           </button>
           <button
             type="button"
-            onClick={() => setToastVisible(false)}
+            onClick={() => setDismissed(true)}
             aria-label="Cerrar aviso de instalación"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-sm text-white/75 transition hover:bg-white/12"
           >
