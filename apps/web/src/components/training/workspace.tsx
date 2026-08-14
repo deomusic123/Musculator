@@ -641,17 +641,17 @@ function AnatomyHeatmap({
     let cancelled = false;
 
     const mountMaps = async () => {
-      const module = await loadMuscleMapModule();
+      const muscleMapModule = await loadMuscleMapModule();
 
       if (cancelled || !frontRef.current || !backRef.current) {
         return;
       }
 
-      if (module.ALL_MUSCLES && module.ALL_MUSCLES.length > 0) {
-        setSupportedMuscles(new Set(module.ALL_MUSCLES));
+      if (muscleMapModule.ALL_MUSCLES && muscleMapModule.ALL_MUSCLES.length > 0) {
+        setSupportedMuscles(new Set(muscleMapModule.ALL_MUSCLES));
       }
 
-      const MuscleMapWidget = module.MuscleMapWidget;
+      const MuscleMapWidget = muscleMapModule.MuscleMapWidget;
       frontWidgetRef.current?.destroy();
       backWidgetRef.current?.destroy();
 
