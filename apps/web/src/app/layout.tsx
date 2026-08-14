@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Source_Sans_3, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { GlobalOverlayProvider } from "@/components/overlays/global-overlay-provider";
+import { PwaDiagnostics } from "@/components/pwa/pwa-diagnostics";
 import { RegisterServiceWorker } from "@/components/pwa/register-sw";
 import "./globals.css";
 
@@ -21,7 +22,6 @@ export const metadata: Metadata = {
   description:
     "Base platform for precision nutrition, biomechanical training logs and readiness analytics.",
   manifest: "/manifest.webmanifest",
-  themeColor: "#0F172A",
   icons: {
     icon: [
       { url: "/icons/logo-any-192.png", sizes: "192x192", type: "image/png" },
@@ -36,6 +36,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0F172A",
+};
+
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="es" className={`${headingFont.variable} ${bodyFont.variable}`}>
@@ -43,16 +50,18 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <Script id="musculator-install-capture" strategy="beforeInteractive">
           {`(() => {
   if (typeof window === "undefined") return;
-  const eventName = "musculator:install-ready";
-  window.__musculatorInstallPromptEvent = window.__musculatorInstallPromptEvent ?? null;
+  window.__musculatorDeferredPrompt = window.__musculatorDeferredPrompt ?? null;
+  window.__musculatorBeforeInstallPromptSeen = Boolean(window.__musculatorBeforeInstallPromptSeen);
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
-    window.__musculatorInstallPromptEvent = event;
-    window.dispatchEvent(new Event(eventName));
+    window.__musculatorDeferredPrompt = event;
+    window.__musculatorBeforeInstallPromptSeen = true;
+    window.dispatchEvent(new Event("musculator:install-ready"));
   });
 })();`}
         </Script>
         <RegisterServiceWorker />
+        <PwaDiagnostics />
         <GlobalOverlayProvider>{children}</GlobalOverlayProvider>
       </body>
     </html>
