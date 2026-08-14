@@ -22,6 +22,12 @@ function resolveInitialSurface(rawSurface: string | string[] | undefined): Dashb
   return "profile";
 }
 
+function resolveInitialLive(rawLive: string | string[] | undefined): boolean {
+  const live = Array.isArray(rawLive) ? rawLive[0] : rawLive;
+
+  return live === "1" || live === "true";
+}
+
 async function loadMainBootstrap(): Promise<TrainingWorkspaceBootstrapData> {
   try {
     const clientResponse = await listClients();
@@ -58,6 +64,7 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
   const integrations = getSetupChecklist();
   const bootstrap = await loadMainBootstrap();
   const initialSurface = resolveInitialSurface(params?.surface);
+  const initialLive = resolveInitialLive(params?.live);
 
   return (
     <TrainingWorkspace
@@ -65,6 +72,7 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
       integrations={integrations}
       bootstrap={bootstrap}
       initialSurface={initialSurface}
+      initialLive={initialLive}
     />
   );
 }

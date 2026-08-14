@@ -18,15 +18,15 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyLabExerciseFilters,
-  buildLabExerciseFilterQueryString,
   defaultLabExerciseFilters,
   parseLabExerciseFiltersFromUrlSearchParams,
   type LabExerciseFilters,
 } from "@/lib/lab/exercise-filters";
+import { softReplaceQuery } from "@/lib/navigation/app-events";
 import type { LabExerciseListItem, LabExerciseListResponse } from "@/lib/lab/persistence";
 
 const movementLabel: Record<LabExerciseListItem["movementPattern"], string> = {
@@ -403,10 +403,7 @@ export function ExerciseCatalog({
   initialFilters = defaultLabExerciseFilters,
   syncWithUrl = false,
 }: ExerciseCatalogProps) {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isRoutePending, startRouteTransition] = useTransition();
 
   const syncUrlEnabled = variant === "standalone" && syncWithUrl;
   const [query, setQuery] = useState(initialFilters.q);
@@ -465,22 +462,14 @@ export function ExerciseCatalog({
       return;
     }
 
-    const nextQuery = buildLabExerciseFilterQueryString({
-      ...activeFilters,
-      q: activeFilters.q.trim(),
+    softReplaceQuery({
+      q: activeFilters.q.trim() || null,
+      pattern: activeFilters.pattern === "all" ? null : activeFilters.pattern,
+      vector: activeFilters.vector === "all" ? null : activeFilters.vector,
+      equipment: activeFilters.equipment === "all" ? null : activeFilters.equipment,
+      cns: activeFilters.cns === "all" ? null : activeFilters.cns,
     });
-    const currentQuery = searchParams.toString();
-
-    if (nextQuery === currentQuery) {
-      return;
-    }
-
-    const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname;
-
-    startRouteTransition(() => {
-      router.replace(nextUrl, { scroll: false });
-    });
-  }, [activeFilters, pathname, router, searchParams, syncUrlEnabled]);
+  }, [activeFilters, syncUrlEnabled]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -521,13 +510,10 @@ export function ExerciseCatalog({
     [initialData.exercises],
   );
 
-  const filteredExercises = useMemo(() => {
-    if (syncUrlEnabled) {
-      return initialData.exercises;
-    }
-
-    return applyLabExerciseFilters(initialData.exercises, activeFilters);
-  }, [activeFilters, initialData.exercises, syncUrlEnabled]);
+  const filteredExercises = useMemo(
+    () => applyLabExerciseFilters(initialData.exercises, activeFilters),
+    [activeFilters, initialData.exercises],
+  );
 
   const groupedExercises = useMemo(() => {
     const groups = new Map<LabExerciseListItem["movementPattern"], LabExerciseListItem[]>();
@@ -722,7 +708,7 @@ export function ExerciseCatalog({
       <div className={`flex items-center justify-between px-1 ${metaClass}`}>
         <span>{filteredExercises.length} ejercicios visibles</span>
         <span className="uppercase tracking-[0.14em]">
-          {syncUrlEnabled && isRoutePending ? "actualizando" : initialData.storage}
+          {initialData.storage}
         </span>
       </div>
 

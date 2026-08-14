@@ -1,7 +1,7 @@
 "use client";
 
 import { trainingTemplateBlueprintSchema, type TrainingTemplateBlueprint, type TrainingTemplateExercise } from "@musculator/contracts";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { LabExerciseListResponse } from "@/lib/lab/persistence";
 import {
   type LabTemplateDetailResponse,
@@ -13,6 +13,7 @@ import {
 interface TemplateBuilderProps {
   initialTemplates: LabTemplateListResponse;
   initialExercises: LabExerciseListResponse;
+  initialTemplate?: LabTemplateDetailResponse | null;
 }
 
 function toOneDecimal(value: number) {
@@ -106,7 +107,11 @@ function getEntryLabel(entry: TrainingTemplateExercise, namesBySlug: Map<string,
   return entry.rawExerciseName ?? "Ejercicio sin nombre";
 }
 
-export function TemplateBuilder({ initialTemplates, initialExercises }: TemplateBuilderProps) {
+export function TemplateBuilder({
+  initialTemplates,
+  initialExercises,
+  initialTemplate = null,
+}: TemplateBuilderProps) {
   const initialExerciseLookup = useMemo(
     () => new Map(initialExercises.exercises.map((exercise) => [exercise.slug, exercise])),
     [initialExercises.exercises],
@@ -114,17 +119,24 @@ export function TemplateBuilder({ initialTemplates, initialExercises }: Template
 
   const [templates, setTemplates] = useState<LabTemplateSummary[]>(initialTemplates.templates);
   const [template, setTemplate] = useState<TrainingTemplateBlueprint>(() => {
+    if (initialTemplate?.template) {
+      return initialTemplate.template;
+    }
+
     return buildDraftTemplate(templateId(), initialExercises.exercises[0]?.slug, initialExerciseLookup);
   });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    initialTemplates.templates[0]?.id ?? null,
+    initialTemplate?.template.id ?? initialTemplates.templates[0]?.id ?? null,
   );
   const [selectedExerciseSlug, setSelectedExerciseSlug] = useState(initialExercises.exercises[0]?.slug ?? "");
-  const [storageMode, setStorageMode] = useState<"supabase" | "noop">(initialTemplates.storage);
+  const [storageMode, setStorageMode] = useState<"supabase" | "noop">(
+    initialTemplate?.storage ?? initialTemplates.storage,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const skipInitialTemplateFetch = useRef(initialTemplate?.template.id ?? null);
 
   const exerciseBySlug = useMemo(
     () => new Map(initialExercises.exercises.map((exercise) => [exercise.slug, exercise])),
@@ -150,12 +162,15 @@ export function TemplateBuilder({ initialTemplates, initialExercises }: Template
       return;
     }
 
+    if (skipInitialTemplateFetch.current === selectedTemplateId) {
+      skipInitialTemplateFetch.current = null;
+      return;
+    }
+
     startTransition(() => {
       void (async () => {
         try {
-          const response = await fetch(`/api/lab/templates/${selectedTemplateId}`, {
-            cache: "no-store",
-          });
+          const response = await fetch(`/api/lab/templates/${selectedTemplateId}`);
           const payload = (await response.json()) as LabTemplateDetailResponse | { error: string };
 
           if (!response.ok || !("template" in payload)) {

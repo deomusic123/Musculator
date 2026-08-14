@@ -25,10 +25,7 @@ export function EmbeddedExerciseCatalog({ className }: EmbeddedExerciseCatalogPr
       try {
         setLoadError(null);
 
-        const response = await fetch("/api/lab/exercises", {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetch("/api/lab/exercises");
         const raw = (await response.json()) as unknown;
 
         if (!response.ok) {

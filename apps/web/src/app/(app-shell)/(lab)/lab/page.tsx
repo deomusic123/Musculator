@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LabIndexPage() {
-  redirect("/lab/exercises");
+  redirect("/lab/templates");
 }

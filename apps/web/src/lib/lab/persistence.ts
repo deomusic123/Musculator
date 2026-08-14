@@ -313,16 +313,21 @@ async function listCatalogFromExercisesTables(
     .sort((left, right) => right.cnsTaxMultiplier - left.cnsTaxMultiplier || left.name.localeCompare(right.name));
 }
 
-export async function listLabExercises(filters: LabExerciseFilters = defaultLabExerciseFilters): Promise<LabExerciseListResponse> {
+const CATALOG_TTL_MS = 60_000;
+
+interface CatalogCacheEntry {
+  expiresAt: number;
+  payload: LabExerciseListResponse;
+}
+
+let catalogCache: CatalogCacheEntry | null = null;
+let catalogInFlight: Promise<LabExerciseListResponse> | null = null;
+
+async function fetchUnfilteredLabCatalog(): Promise<LabExerciseListResponse> {
   const context = await getTrainingPersistenceContext();
 
   if (!context.configured) {
-    const preview = buildPreviewResponse();
-
-    return {
-      ...preview,
-      exercises: applyLabExerciseFilters(preview.exercises, filters),
-    };
+    return buildPreviewResponse();
   }
 
   const admin = createAdminSupabaseClient();
@@ -358,15 +363,10 @@ export async function listLabExercises(filters: LabExerciseFilters = defaultLabE
         return {
           status: "connected",
           storage: context.storage,
-          exercises: applyLabExerciseFilters(fallbackExercises, filters),
+          exercises: fallbackExercises,
         };
       } catch {
-        const preview = buildPreviewResponse();
-
-        return {
-          ...preview,
-          exercises: applyLabExerciseFilters(preview.exercises, filters),
-        };
+        return buildPreviewResponse();
       }
     }
 
@@ -380,6 +380,44 @@ export async function listLabExercises(filters: LabExerciseFilters = defaultLabE
   return {
     status: "connected",
     storage: context.storage,
-    exercises: applyLabExerciseFilters(exercises, filters),
+    exercises,
+  };
+}
+
+async function loadUnfilteredLabCatalog(): Promise<LabExerciseListResponse> {
+  const now = Date.now();
+
+  if (catalogCache && catalogCache.expiresAt > now) {
+    return catalogCache.payload;
+  }
+
+  if (catalogInFlight) {
+    return catalogInFlight;
+  }
+
+  catalogInFlight = fetchUnfilteredLabCatalog()
+    .then((payload) => {
+      catalogCache = {
+        expiresAt: Date.now() + CATALOG_TTL_MS,
+        payload,
+      };
+
+      return payload;
+    })
+    .finally(() => {
+      catalogInFlight = null;
+    });
+
+  return catalogInFlight;
+}
+
+export async function listLabExercises(
+  filters: LabExerciseFilters = defaultLabExerciseFilters,
+): Promise<LabExerciseListResponse> {
+  const catalog = await loadUnfilteredLabCatalog();
+
+  return {
+    ...catalog,
+    exercises: applyLabExerciseFilters(catalog.exercises, filters),
   };
 }

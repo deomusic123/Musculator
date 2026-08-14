@@ -12,7 +12,7 @@ interface LabExercisesPageProps {
 export default async function LabExercisesPage({ searchParams }: LabExercisesPageProps) {
   const rawSearchParams = searchParams ? await searchParams : undefined;
   const filters = parseLabExerciseFiltersFromRecord(rawSearchParams);
-  const initialData = await listLabExercises(filters);
+  const initialData = await listLabExercises();
 
   return (
     <ExerciseCatalog

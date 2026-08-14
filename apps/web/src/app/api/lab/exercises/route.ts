@@ -10,7 +10,11 @@ export async function GET(request: Request) {
     const filters = parseLabExerciseFiltersFromUrlSearchParams(new URL(request.url).searchParams);
     const response = await listLabExercises(filters);
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+      },
+    });
   } catch (caughtError) {
     return NextResponse.json(
       {

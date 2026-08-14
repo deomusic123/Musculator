@@ -11,3 +11,4 @@ dist
 .env.production.local
 !.env.example
 !.env.*.example
+apps/web/src/lib/MuscleMapJS/
