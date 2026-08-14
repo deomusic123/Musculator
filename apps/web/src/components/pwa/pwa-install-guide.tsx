@@ -16,6 +16,9 @@ declare global {
   }
 }
 
+const TOAST_VISIBLE_MS = 7000;
+const TOAST_REAPPEAR_MS = 45000;
+
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -46,12 +49,14 @@ export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
   const [installFeedback, setInstallFeedback] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
+    setToastVisible(true);
     setInstallFeedback(null);
     setInstallPrompt(getCapturedInstallPrompt());
 
@@ -68,6 +73,7 @@ export function PwaInstallGuide() {
 
     const onAppInstalled = () => {
       setIsInstalled(true);
+      setToastVisible(false);
       setInstallPrompt(null);
       clearCapturedInstallPrompt();
       setInstallFeedback(null);
@@ -92,6 +98,8 @@ export function PwaInstallGuide() {
       return;
     }
 
+    setToastVisible(true);
+
     const timeoutId = window.setTimeout(() => {
       setInstallFeedback(null);
     }, 2600);
@@ -100,6 +108,34 @@ export function PwaInstallGuide() {
       window.clearTimeout(timeoutId);
     };
   }, [installFeedback]);
+
+  useEffect(() => {
+    if (!toastVisible || isInstalled) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToastVisible(false);
+    }, TOAST_VISIBLE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isInstalled, toastVisible]);
+
+  useEffect(() => {
+    if (isInstalled) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setToastVisible(true);
+    }, TOAST_REAPPEAR_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isInstalled]);
 
   const runInstallPrompt = async () => {
     setIsInstalling(true);
@@ -133,12 +169,12 @@ export function PwaInstallGuide() {
     }
   };
 
-  if (!hasMounted || isInstalled) {
+  if (!hasMounted || isInstalled || !toastVisible) {
     return null;
   }
 
   return (
-    <section className="mb-3 rounded-2xl border border-white/10 bg-[#0b1420] px-3 py-2.5 text-white shadow-[0_10px_30px_rgba(2,6,23,0.2)] sm:px-4">
+    <section className="fixed inset-x-3 bottom-[calc(5.3rem+env(safe-area-inset-bottom))] z-50 rounded-2xl border border-white/12 bg-[#0b1420]/96 px-3 py-2.5 text-white shadow-[0_12px_36px_rgba(2,6,23,0.35)] backdrop-blur xl:inset-x-auto xl:bottom-4 xl:right-4 xl:w-[360px]">
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-sm text-white/82">Utilizalo como app.</p>
         <div className="flex items-center gap-2">
@@ -149,6 +185,14 @@ export function PwaInstallGuide() {
             className="inline-flex h-9 items-center justify-center rounded-full bg-[#4cb894] px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isInstalling ? "Abriendo..." : "Instalar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setToastVisible(false)}
+            aria-label="Cerrar aviso de instalación"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-sm text-white/75 transition hover:bg-white/12"
+          >
+            ×
           </button>
         </div>
       </div>

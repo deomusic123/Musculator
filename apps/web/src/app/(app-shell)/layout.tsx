@@ -11,7 +11,7 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <AppNav />
         </Suspense>
-        <div className="min-w-0 flex-1 pb-[calc(7.5rem+env(safe-area-inset-bottom))] xl:pb-0">
+        <div className="min-w-0 flex-1 pb-[calc(6.3rem+env(safe-area-inset-bottom))] xl:pb-0">
           <PwaInstallGuide />
           {children}
         </div>

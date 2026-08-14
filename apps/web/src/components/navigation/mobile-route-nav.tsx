@@ -63,9 +63,9 @@ export function MobileRouteNav() {
   return (
     <nav
       data-global-mobile-nav="true"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#08111a]/98 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-2 text-white shadow-[0_-14px_36px_rgba(2,6,23,0.35)] backdrop-blur xl:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#08111a]/98 px-0 pb-[max(0.28rem,env(safe-area-inset-bottom))] pt-1 text-white shadow-[0_-14px_36px_rgba(2,6,23,0.35)] backdrop-blur xl:hidden"
     >
-      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-0.5">
+      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-stretch gap-0">
         {mobileDestinations.map((item) => {
           const active = isNavItemActive(pathname, surface, item);
 
@@ -75,7 +75,7 @@ export function MobileRouteNav() {
                 key={item.id}
                 type="button"
                 onClick={() => handleSurfaceNav(item)}
-                className={`flex min-h-14 flex-col items-center justify-center rounded-lg border-t-2 px-2 py-2 text-center transition ${
+                className={`flex min-h-13 flex-col items-center justify-center border-t-[3px] px-1.5 py-1.5 text-center transition ${
                   active
                     ? "border-[#4cb894] bg-white/8 text-white"
                     : "border-transparent bg-transparent text-white/72 hover:bg-white/6 hover:text-white"
@@ -92,7 +92,7 @@ export function MobileRouteNav() {
               key={item.id}
               href={item.href}
               prefetch
-              className={`flex min-h-14 flex-col items-center justify-center rounded-lg border-t-2 px-2 py-2 text-center transition ${
+              className={`flex min-h-13 flex-col items-center justify-center border-t-[3px] px-1.5 py-1.5 text-center transition ${
                 active
                   ? "border-[#4cb894] bg-white/8 text-white"
                   : "border-transparent bg-transparent text-white/72 hover:bg-white/6 hover:text-white"
@@ -107,7 +107,7 @@ export function MobileRouteNav() {
         <button
           type="button"
           onClick={handleTrainNav}
-          className="flex min-h-14 min-w-14 items-center justify-center rounded-lg border-t-2 border-[#4cb894] bg-[#4cb894]/15 px-4 text-sm font-semibold text-[#9cf3d3] transition hover:bg-[#4cb894]/25"
+          className="flex min-h-13 min-w-14 items-center justify-center border-t-[3px] border-[#4cb894] bg-[#4cb894]/15 px-3 text-sm font-semibold text-[#9cf3d3] transition hover:bg-[#4cb894]/25"
         >
           {NAV_LABELS.train}
         </button>
