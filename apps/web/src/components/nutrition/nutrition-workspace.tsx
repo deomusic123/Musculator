@@ -200,6 +200,10 @@ export function NutritionWorkspace({
 }: NutritionWorkspaceProps) {
   const [dateKey, setDateKey] = useState(() => toDateKey());
   const [store, setStore] = useState<NutritionStore>({});
+  const [remoteDayLog, setRemoteDayLog] = useState<NutritionDayLog | null>(null);
+  const [isRemoteLoading, setIsRemoteLoading] = useState(false);
+  const [remoteDirty, setRemoteDirty] = useState(false);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<MealDraft>(() => toMealDraft("desayuno"));
@@ -228,12 +232,73 @@ export function NutritionWorkspace({
   }, [store]);
 
   const clientKey = clientId ?? "preview";
+  const canUseRemotePersistence = persistenceEnabled && Boolean(clientId);
   const inferredTargets = useMemo(() => inferTargets(clientGoal, weightKg), [clientGoal, weightKg]);
 
+  useEffect(() => {
+    if (!canUseRemotePersistence || !clientId) {
+      setRemoteDayLog(null);
+      setRemoteDirty(false);
+      setRemoteError(null);
+      setIsRemoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsRemoteLoading(true);
+
+    const query = new URLSearchParams({
+      clientId,
+      date: dateKey,
+      defaultKcal: String(inferredTargets.kcal),
+      defaultProtein: String(inferredTargets.protein),
+      defaultCarbs: String(inferredTargets.carbs),
+      defaultFats: String(inferredTargets.fats),
+      defaultWaterMl: String(inferredTargets.waterMl),
+    });
+
+    fetch(`/api/nutrition/day?${query.toString()}`, { method: "GET", cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "No se pudo cargar nutricion.");
+        }
+        return payload;
+      })
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        setRemoteDayLog((payload?.dayLog as NutritionDayLog | undefined) ?? buildDefaultDayLog(inferredTargets));
+        setRemoteDirty(false);
+        setRemoteError(null);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setRemoteDayLog(buildDefaultDayLog(inferredTargets));
+        setRemoteError(error instanceof Error ? error.message : "No se pudo cargar nutricion.");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRemoteLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canUseRemotePersistence, clientId, dateKey, inferredTargets]);
+
   const dayLog = useMemo(() => {
+    if (canUseRemotePersistence) {
+      return remoteDayLog ?? buildDefaultDayLog(inferredTargets);
+    }
+
     const clientLogs = store[clientKey] ?? {};
     return clientLogs[dateKey] ?? buildDefaultDayLog(inferredTargets);
-  }, [clientKey, dateKey, inferredTargets, store]);
+  }, [canUseRemotePersistence, clientKey, dateKey, inferredTargets, remoteDayLog, store]);
 
   const sortedMeals = useMemo(
     () => [...dayLog.meals].sort((left, right) => left.time.localeCompare(right.time)),
@@ -270,6 +335,12 @@ export function NutritionWorkspace({
   const timeFieldClass = `${fieldBaseClass} [color-scheme:dark]`;
 
   const upsertDayLog = (updater: (current: NutritionDayLog) => NutritionDayLog) => {
+    if (canUseRemotePersistence) {
+      setRemoteDayLog((current) => updater(current ?? buildDefaultDayLog(inferredTargets)));
+      setRemoteDirty(true);
+      return;
+    }
+
     setStore((currentStore) => {
       const clientLogs = currentStore[clientKey] ?? {};
       const currentDay = clientLogs[dateKey] ?? buildDefaultDayLog(inferredTargets);
@@ -283,6 +354,44 @@ export function NutritionWorkspace({
       };
     });
   };
+
+  useEffect(() => {
+    if (!canUseRemotePersistence || !clientId || !remoteDirty || !remoteDayLog) {
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/nutrition/day", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clientId,
+            dateKey,
+            dayLog: remoteDayLog,
+          }),
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "No se pudo sincronizar nutricion.");
+        }
+
+        setRemoteDayLog((payload?.dayLog as NutritionDayLog | undefined) ?? remoteDayLog);
+        setRemoteDirty(false);
+        setRemoteError(null);
+      } catch (error) {
+        setRemoteError(error instanceof Error ? error.message : "No se pudo sincronizar nutricion.");
+      }
+    }, 420);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [canUseRemotePersistence, clientId, dateKey, remoteDayLog, remoteDirty]);
 
   const handleTargetChange = (field: keyof MacroTargets, value: string) => {
     const parsed = Math.round(parseNumberInput(value));
@@ -410,12 +519,12 @@ export function NutritionWorkspace({
           </div>
           <span
             className={`rounded-full border px-4 py-2 text-xs uppercase tracking-[0.18em] ${
-              persistenceEnabled
+              canUseRemotePersistence
                 ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-200"
                 : "border-amber-400/25 bg-amber-500/12 text-amber-200"
             }`}
           >
-            {persistenceEnabled ? "perfil conectado" : "guardado local"}
+            {canUseRemotePersistence ? (remoteDirty ? "sincronizando" : "perfil conectado") : "guardado local"}
           </span>
         </div>
 
@@ -451,6 +560,11 @@ export function NutritionWorkspace({
             {supportDeltaPercent}% · recuperación {recoveryGapPercent}%
           </p>
         </div>
+
+        {isRemoteLoading ? (
+          <p className="mt-3 text-xs text-white/55">Cargando nutrición del día...</p>
+        ) : null}
+        {remoteError ? <p className="mt-3 text-xs text-rose-200">{remoteError}</p> : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-[1.25rem] border border-white/10 bg-white/6 p-3.5">
