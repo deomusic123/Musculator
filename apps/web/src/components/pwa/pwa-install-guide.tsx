@@ -2,14 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{
-    outcome: "accepted" | "dismissed";
-    platform: string;
-  }>;
-};
-
 function isRunningStandalone() {
   if (typeof window === "undefined") {
     return false;
@@ -20,35 +12,33 @@ function isRunningStandalone() {
   return byDisplayMode || iosStandalone;
 }
 
+async function openShareSheetForInstall() {
+  if (typeof window === "undefined" || typeof navigator === "undefined" || !navigator.share) {
+    return false;
+  }
+
+  try {
+    await navigator.share({
+      title: "Musculator",
+      text: "Instalá Musculator como app.",
+      url: window.location.href,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function PwaInstallGuide() {
   const [hasMounted, setHasMounted] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installFeedback, setInstallFeedback] = useState<string | null>(null);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
     setIsInstalled(isRunningStandalone());
-
-    const onBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    const onAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-      setInstallFeedback(null);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
-    };
+    setInstallFeedback(null);
   }, []);
 
   useEffect(() => {
@@ -66,24 +56,13 @@ export function PwaInstallGuide() {
   }, [installFeedback]);
 
   const runInstallPrompt = async () => {
-    if (!deferredPrompt) {
-      setInstallFeedback("Instalación no disponible todavía en este navegador.");
-      return;
-    }
-
     setIsInstalling(true);
     try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
+      const openedShareSheet = await openShareSheetForInstall();
 
-      if (choice.outcome === "accepted") {
-        setIsInstalled(true);
-        setDeferredPrompt(null);
-        return;
+      if (!openedShareSheet) {
+        setInstallFeedback("No se pudo abrir compartir en este navegador.");
       }
-
-      setDeferredPrompt(null);
-      setInstallFeedback("Instalación cancelada.");
     } finally {
       setIsInstalling(false);
     }
@@ -102,11 +81,7 @@ export function PwaInstallGuide() {
             type="button"
             onClick={() => void runInstallPrompt()}
             disabled={isInstalling}
-            className={`inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-semibold uppercase tracking-[0.14em] transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              deferredPrompt
-                ? "bg-[#4cb894] text-slate-950 hover:bg-[#63c7a5]"
-                : "border border-[#4cb894]/45 bg-[#4cb894]/12 text-[#9cf3d3] hover:bg-[#4cb894]/20"
-            }`}
+            className="inline-flex h-9 items-center justify-center rounded-full bg-[#4cb894] px-4 text-xs font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-[#63c7a5] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isInstalling ? "Abriendo..." : "Instalar"}
           </button>
